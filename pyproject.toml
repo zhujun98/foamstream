@@ -16,21 +16,27 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Scientific/Engineering :: Streaming",
 ]
 dependencies = [
     'numpy',
-    'pyzmq'
+    'pyzmq',
 ]
 requires-python = ">=3.9"
 
 [project.optional-dependencies]
+gui = [
+    "foamgraph"
+]
 test = [
     "pytest",
     "pytest-cov",
+]
+euxfel = [
+    "extra-data"
+    "karabo-bridge"
 ]
 
 [project.urls]
