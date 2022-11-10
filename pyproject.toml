@@ -26,6 +26,10 @@ dependencies = [
 ]
 requires-python = ">=3.9"
 
+[project.scripts]
+foamstream-euxfel = "foamstream.euxfel.app:application"
+foamstream-tomcat = "foamstream.sls.tomcat:main"
+
 [project.optional-dependencies]
 gui = [
     "foamgraph"
@@ -35,7 +39,7 @@ test = [
     "pytest-cov",
 ]
 euxfel = [
-    "extra-data"
+    "extra-data",
     "karabo-bridge"
 ]
 
