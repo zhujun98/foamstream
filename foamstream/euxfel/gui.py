@@ -19,15 +19,13 @@ from foamgraph.backend.QtWidgets import (
     QPushButton, QSlider, QSplitter, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QHBoxLayout, QWidget, QDoubleSpinBox, QStackedWidget
 )
+from foamgraph import createIconButton, GuiLoggingHandler, SmartLineEdit
+
 from extra_data import RunDirectory, open_run
 
-# from .base_window import _AbstractSatelliteWindow
-from foamgraph import createIconButton, GuiLoggingHandler, SmartLineEdit
-from logger import logger
-from file_server import (
-    gather_sources, run_info, serve_files
-)
-from config import StreamMode
+from .logger import logger
+from .file_server import gather_sources, run_info, serve_files
+from .config import StreamMode
 
 
 class RunData(Enum):

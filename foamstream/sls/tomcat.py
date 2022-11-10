@@ -1,11 +1,11 @@
-import numpy as np
-import zmq
-import json
 import argparse
-from queue import deque, Queue
+from collections import deque
+from queue import Queue
 from threading import Thread
 import time
 
+import numpy as np
+import zmq
 import h5py
 
 

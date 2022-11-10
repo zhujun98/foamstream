@@ -2,11 +2,11 @@ import argparse
 
 from foamgraph import mkQApp
 
-from gui import FileStreamWindow
+from .gui import FileStreamWindow
 
 
-def stream_file():
-    parser = argparse.ArgumentParser(prog="extra-foam-stream")
+def application():
+    parser = argparse.ArgumentParser(prog="foamstream-euxfel")
     parser.add_argument("--port",
                         help="TCP port to run server on",
                         default="45454")
@@ -19,4 +19,4 @@ def stream_file():
 
 
 if __name__ == "__main__":
-    stream_file()
+    application()

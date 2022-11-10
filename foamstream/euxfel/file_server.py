@@ -13,7 +13,7 @@ from collections import deque
 from extra_data import by_id
 from karabo_bridge import ServerInThread
 
-from config import StreamMode
+from .config import StreamMode
 
 
 _ALL_PROPERTIES = "*"
