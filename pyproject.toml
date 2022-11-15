@@ -21,6 +21,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Streaming",
 ]
 dependencies = [
+    'h5py',
     'numpy',
     'pyzmq',
 ]
@@ -31,17 +32,18 @@ foamstream-euxfel = "foamstream.euxfel.app:application"
 foamstream-tomcat = "foamstream.sls.tomcat:main"
 
 [project.optional-dependencies]
-gui = [
-    "foamgraph"
-]
 test = [
     "pytest",
     "pytest-cov",
 ]
 euxfel = [
+    "foamgraph",
     "extra-data",
     "karabo-bridge"
 ]
+
+[tool.setuptools.package-data]
+"foamstream.euxfel.icons" = ["*.png"]
 
 [project.urls]
 repository = "https://github.com/zhujun98/foamstream"
