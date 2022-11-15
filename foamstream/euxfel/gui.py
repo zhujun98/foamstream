@@ -1,6 +1,6 @@
 """
 Distributed under the terms of the BSD 3-Clause License.
-The full license is in the file LICENSE, distributed with this software.
+
 Author: Ebad Kamil <ebad.kamil@xfel.eu> and Jun Zhu <jun.zhu@xfel.eu>
 Copyright (C) European X-Ray Free-Electron Laser Facility GmbH.
 All rights reserved.
@@ -9,6 +9,7 @@ from enum import Enum
 from collections import OrderedDict
 from multiprocessing import Process, Value
 from contextlib import closing
+import os.path as osp
 import socket
 
 from foamgraph.backend.QtCore import Qt, QTimer, pyqtSignal
@@ -23,9 +24,9 @@ from foamgraph import createIconButton, GuiLoggingHandler, SmartLineEdit
 
 from extra_data import RunDirectory, open_run
 
-from .logger import logger
+from ..logger import logger
+from . import StreamMode
 from .file_server import gather_sources, run_info, serve_files
-from .config import StreamMode
 
 
 class RunData(Enum):
@@ -39,7 +40,7 @@ class DataSelector(Enum):
     RUN_NUMBER = "Proposal/run number"
 
 
-class _FileStreamCtrlWidget(QWidget):
+class FileStreamCtrlWidget(QWidget):
 
     GROUP_BOX_STYLE_SHEET = 'QGroupBox:title {' \
                             'color: #8B008B;' \
@@ -79,12 +80,13 @@ class _FileStreamCtrlWidget(QWidget):
 
         self.run_source_sw = QStackedWidget()
 
+        dirname = osp.dirname(osp.realpath(__file__))
         self.serve_start_btn = createIconButton(
-            "icons/start.png", 18, description="Stream once")
+            f"{dirname}/icons/start.png", 18, description="Stream once")
         self.repeat_serve_start_btn = createIconButton(
-            "icons/repeat.png", 18, description="Stream repeatedly")
+            f"{dirname}/icons/repeat.png", 18, description="Stream repeatedly")
         self.serve_terminate_btn = createIconButton(
-            "icons/stop.png", 18, description="Stop stream")
+            f"{dirname}/icons/stop.png", 18, description="Stop stream")
         self.serve_terminate_btn.setEnabled(False)
 
         self.mode_cb = QComboBox()
@@ -407,7 +409,7 @@ class FileStreamWindow(QMainWindow):
 
         self._cw = QWidget()
 
-        self._ctrl_widget = _FileStreamCtrlWidget(parent=self)
+        self._ctrl_widget = FileStreamCtrlWidget(parent=self)
         port_le = self._ctrl_widget.port_le
         if self.parent() is None:
             # opened from the terminal
@@ -423,7 +425,6 @@ class FileStreamWindow(QMainWindow):
         self.initUI()
         self.initConnections()
 
-        self.setMinimumSize(1440, 960)
         self.setCentralWidget(self._cw)
 
         self.show()

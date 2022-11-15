@@ -1,6 +1,6 @@
 """
 Distributed under the terms of the BSD 3-Clause License.
-The full license is in the file LICENSE, distributed with this software.
+
 Author: Jun Zhu <jun.zhu@xfel.eu>
 Copyright (C) European X-Ray Free-Electron Laser Facility GmbH.
 All rights reserved.
@@ -13,7 +13,7 @@ from collections import deque
 from extra_data import by_id
 from karabo_bridge import ServerInThread
 
-from .config import StreamMode
+from . import StreamMode
 
 
 _ALL_PROPERTIES = "*"
@@ -21,6 +21,7 @@ _ALL_PROPERTIES = "*"
 
 def run_info(rd):
     """Return the basic information of a run.
+
     :param DataCollection rd: the run data.
     """
     if rd is None:
@@ -35,8 +36,10 @@ def run_info(rd):
 
 def _sorted_properties(orig, prioritized):
     """Return the sorted properties.
+
     :param set orig: original properties.
     :param list prioritized: properties to be prioritized.
+
     The properties will be sorted by:
     1. sorted prioritized properties;
     2. "*";
@@ -56,6 +59,7 @@ def _sorted_properties(orig, prioritized):
 
 def gather_sources(rd):
     """Gather device IDs and properties from run data.
+
     :param DataCollection rd: Run data.
     :return: A tuple of dictionaries with keys being the device IDs /
         output channels and values being a list of available properties.
@@ -109,6 +113,7 @@ def gather_sources(rd):
 
 def generate_meta(devices, tid):
     """Generate metadata in case of repeating stream.
+
     :param iterable devices: a list of device IDs.
     :param int tid: train ID.
     """
@@ -130,6 +135,7 @@ def serve_files(run, port, shared_tid, shared_rate, max_rate,
                 buffer_size=2,
                 **kwargs):
     """Stream data from files through a TCP socket.
+
     Parameters
     ----------
     run: DataCollection

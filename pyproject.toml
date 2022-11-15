@@ -42,5 +42,8 @@ euxfel = [
     "karabo-bridge"
 ]
 
+[tool.setuptools.package-data]
+"foamstream.euxfel.icons" = ["*.png"]
+
 [project.urls]
 repository = "https://github.com/zhujun98/foamstream"
