@@ -20,16 +20,13 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Streaming",
 ]
+requires-python = ">=3.9"
+
 dependencies = [
     'h5py',
     'numpy',
     'pyzmq',
 ]
-requires-python = ">=3.9"
-
-[project.scripts]
-foamstream-euxfel = "foamstream.euxfel.app:application"
-foamstream-tomcat = "foamstream.sls.tomcat:main"
 
 [project.optional-dependencies]
 test = [
@@ -41,6 +38,11 @@ euxfel = [
     "extra-data",
     "karabo-bridge"
 ]
+
+[project.scripts]
+foamstream-euxfel = "foamstream.euxfel.app:application"
+foamstream-tomcat = "foamstream.sls.tomcat:main"
+foamstream-debye = "foamstream.sls.debye:main"
 
 [tool.setuptools.package-data]
 "foamstream.euxfel.icons" = ["*.png"]
