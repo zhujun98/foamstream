@@ -27,9 +27,9 @@ def read_sample_data(sampling_rate: float = 1):
     else:
         raise ValueError
 
-    data = np.load(str(foldername.joinpath(data_file)))
+    samples = np.load(str(foldername.joinpath(data_file)))
     encoder = np.load(str(foldername.joinpath(encoder_file)))
-    return data, encoder
+    return samples, encoder
 
 
 def main():
@@ -47,11 +47,14 @@ def main():
         data_rate = 1  # data rate in Hz
         sampling_rate = 1  # sampling rate in MHz
 
-        data, encoder = read_sample_data(sampling_rate)
+        samples, encoder = read_sample_data(sampling_rate)
         npts = sampling_rate * 1000000
-        n = int(data.shape[1] / npts)
+        n = int(samples.shape[1] / npts)
         for i in range(n):
-            streamer.feed(data[:, i * npts:(i + 1) * npts])
+            streamer.feed({
+                "samples": samples[:, i * npts:(i + 1) * npts],
+                "encoder": encoder[i * npts:(i + 1) * npts]
+            })
 
 
 if __name__ == "__main__":
