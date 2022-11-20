@@ -7,6 +7,7 @@ Author: Jun Zhu <jun.zhu@psi.ch>
 """
 import argparse
 from pathlib import Path
+import time
 
 import numpy as np
 
@@ -33,12 +34,15 @@ def read_sample_data(sampling_rate: float = 1):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Fake GigaFrost Data Stream')
+    parser = argparse.ArgumentParser(description='Debye data Stream')
 
     parser.add_argument('--port', default="45454", type=int,
                         help="ZMQ socket port (default=45454)")
-    parser.add_argument('--sock', default='push', type=str,
-                        help="ZMQ socket type (default=PUSH)")
+    parser.add_argument('--sock', default='pub', type=str,
+                        help="ZMQ socket type (default=PUB)")
+    parser.add_argument('--repeat', action='store_true',
+                        help="Repeat data streaming when reaching the end of "
+                             "the dataset")
 
     args = parser.parse_args()
 
@@ -50,11 +54,20 @@ def main():
         samples, encoder = read_sample_data(sampling_rate)
         npts = sampling_rate * 1000000
         n = int(samples.shape[1] / npts)
-        for i in range(n):
-            streamer.feed({
-                "samples": samples[:, i * npts:(i + 1) * npts],
-                "encoder": encoder[i * npts:(i + 1) * npts]
-            })
+        idx = 0
+        while True:
+            for i in range(n):
+                idx += 1
+                streamer.feed({
+                    "index": idx,  # for debug
+                    "samples": samples[:, i * npts:(i + 1) * npts],
+                    "encoder": encoder[i * npts:(i + 1) * npts]
+                })
+                time.sleep(1./data_rate)
+                print(f"Data {idx} sent")
+
+            if not args.repeat:
+                break
 
 
 if __name__ == "__main__":

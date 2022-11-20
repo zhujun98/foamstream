@@ -35,7 +35,7 @@ class Streamer:
         if sock == 'PUSH':
             self._socket = self._ctx.socket(zmq.PUSH)
         elif sock == 'PUB':
-            self._socket = self._ctx.socket(zmq.SUB)
+            self._socket = self._ctx.socket(zmq.PUB)
         else:
             raise ValueError('Unsupported ZMQ socket type: %s' % str(sock))
 
@@ -60,6 +60,7 @@ class Streamer:
         while not self._ev.is_set():
             payload = self._pack(self._buffer.get())
             self._socket.send(payload)
+            time.sleep(0)
 
     def stop(self) -> None:
         self._ev.set()
