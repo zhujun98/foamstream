@@ -15,6 +15,8 @@ import numpy as np
 import zmq
 import h5py
 
+from ..streamer import Streamer
+
 
 sentinel = object()
 frange = None
@@ -83,11 +85,7 @@ def gen_meta(scan_index, frame_index, shape):
     }
 
 
-def gen_fake_data(socket, scan_index, n, *, shape):
-    queue = Queue()
-    thread = Thread(target=send, args=(socket, queue))
-    thread.start()
-
+def gen_fake_data(scan_index, n, *, shape):
     darks = [np.random.randint(500, size=shape, dtype=np.uint16)
              for _ in range(10)]
     whites = [3596 + np.random.randint(500, size=shape, dtype=np.uint16)
@@ -106,18 +104,12 @@ def gen_fake_data(socket, scan_index, n, *, shape):
             data = whites[np.random.choice(len(whites))]
         else:
             data = projections[np.random.choice(len(projections))]
-        queue.put((meta, data))
 
-    queue.put((None, sentinel))
-    thread.join()
+        yield meta, data
 
 
-def stream_data_file(filepath, socket,  scan_index, *,
+def stream_data_file(filepath,  scan_index, *,
                      start, end):
-    queue = Queue()
-    thread = Thread(target=send, args=(socket, queue))
-    thread.start()
-
     with h5py.File(filepath, "r") as fp:
         if scan_index == 0:
             ds = fp["/exchange/data_dark"]
@@ -142,10 +134,8 @@ def stream_data_file(filepath, socket,  scan_index, *,
             # than the index range.
             data = np.zeros(shape, dtype=np.uint16)
             ds.read_direct(data, np.s_[i % n_images, ...], None)
-            queue.put((meta, data))
 
-    queue.put((None, sentinel))
-    thread.join()
+            yield meta, data
 
 
 def parse_datafile(name: str):
@@ -192,41 +182,35 @@ def main():
                              "pet1 (400), pet2 (500), pet3 (500), asm (400), h1 (500)")
 
     args = parser.parse_args()
-    port = args.port
-    sock_type = args.sock.upper()
 
     datafile = parse_datafile(args.datafile)
 
-    context = zmq.Context()
+    with Streamer(args.port,
+                  serializer=lambda x: x,
+                  sock=args.sock) as streamer:
 
-    if sock_type == "PUSH":
-        socket = context.socket(zmq.PUSH)
-    elif sock_type == "PUB":
-        socket = context.socket(zmq.PUB)
-    else:
-        raise RuntimeError(f"Unknown sock type: {sock_type}")
-    socket.bind(f"tcp://*:{port}")
+        global frange
+        frange = range if args.ordered else shuffled_range
 
-    global frange
-    frange = range if args.ordered else shuffled_range
-
-    if datafile:
-        print(f"Streaming data from {datafile} ...")
-    else:
-        print("Streaming randomly generated data ...")
-
-    for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
-        if not datafile:
-            gen_fake_data(socket, scan_index, n, shape=(args.rows, args.cols))
+        if datafile:
+            print(f"Streaming data from {datafile} ...")
         else:
-            if scan_index == 2:
-                stream_data_file(datafile, socket, scan_index,
-                                 start=args.start,
-                                 end=args.start + n)
+            print("Streaming randomly generated data ...")
+
+        for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
+            if not datafile:
+                item = gen_fake_data(scan_index, n, shape=(args.rows, args.cols))
             else:
-                stream_data_file(datafile, socket, scan_index,
-                                 start=0,
-                                 end=n)
+                if scan_index == 2:
+                    item = stream_data_file(datafile, scan_index,
+                                            start=args.start,
+                                            end=args.start + n)
+                else:
+                    item = stream_data_file(datafile, scan_index,
+                                            start=0,
+                                            end=n)
+
+            streamer.feed(item)
 
 
 if __name__ == "__main__":
