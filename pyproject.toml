@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "foamstream"
-version = "0.1.0dev"
+version = "0.1.0"
 description = ""
 authors = [
     {name = "Jun Zhu", email="zhujun981661@gmail.com"},
@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Topic :: Scientific/Engineering :: Streaming",
+    "Topic :: Scientific/Engineering :: Information Analysis"
 ]
 requires-python = ">=3.9"
 
