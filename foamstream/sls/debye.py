@@ -46,7 +46,9 @@ def main():
 
     args = parser.parse_args()
 
-    with Streamer(args.port, SerializerType.SLS, sock=args.sock) as streamer:
+    with Streamer(args.port,
+                  serializer=SerializerType.SLS,
+                  sock=args.sock) as streamer:
         # The following parameters should be included in meta data
         data_rate = 1  # data rate in Hz
         sampling_rate = 1  # sampling rate in MHz
