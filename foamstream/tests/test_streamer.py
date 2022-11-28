@@ -1,5 +1,3 @@
-import pickle
-from threading import Thread
 import time
 
 import pytest
