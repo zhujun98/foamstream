@@ -50,7 +50,7 @@ def main():
                   serializer=SerializerType.SLS,
                   sock=args.sock) as streamer:
         # The following parameters should be included in meta data
-        data_rate = 1  # data rate in Hz
+        data_rate = 10  # data rate in Hz
         sampling_rate = 1  # sampling rate in MHz
 
         samples, encoder = read_sample_data(sampling_rate)

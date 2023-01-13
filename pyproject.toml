@@ -23,9 +23,9 @@ classifiers = [
 requires-python = ">=3.9"
 
 dependencies = [
-    'h5py',
+    'h5py>=3.7.0',
     'numpy',
-    'pyzmq',
+    'pyzmq>=24.0.0',
 ]
 
 [project.optional-dependencies]
