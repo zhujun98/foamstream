@@ -21,7 +21,8 @@ class Streamer:
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
                  request: bytes = b"READY",
-                 buffer_size: int = 10):
+                 buffer_size: int = 10,
+                 daemon: bool = False):
         """Initialization.
 
         :param port: port of the ZMQ server.
@@ -34,6 +35,8 @@ class Streamer:
             type is REP.
         :param buffer_size: size of the internal buffer for holding the data
             to be sent.
+        :param daemon: True for making the thread in which the socket runs a daemon
+            thread.
         """
         self._port = port
         self._ctx = zmq.Context()
@@ -60,7 +63,7 @@ class Streamer:
 
         self._buffer = Queue(maxsize=buffer_size)
 
-        self._thread = Thread(target=self._run)
+        self._thread = Thread(target=self._run, daemon=daemon)
         self._ev = Event()
 
     def _init_socket(self):
@@ -103,7 +106,8 @@ class Streamer:
 
     def stop(self) -> None:
         self._ev.set()
-        self._thread.join()
+        if not self._thread.isDaemon():
+            self._thread.join()
 
     def __enter__(self):
         self.start()
