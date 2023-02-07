@@ -9,9 +9,10 @@ from foamstream import Streamer
 _PORT = 12345
 
 
+@pytest.mark.parametrize("daemon", [True, False])
 @pytest.mark.parametrize("server_sock,client_sock", [("PUSH", "PULL"), ("PUB", "SUB"), ("REP", "REQ")])
-def test_zmq_client_push_pull(server_sock, client_sock):
-    with Streamer(port=_PORT, sock=server_sock) as streamer:
+def test_zmq_streamer(server_sock, client_sock, daemon):
+    with Streamer(port=_PORT, sock=server_sock, daemon=daemon) as streamer:
         with ZmqConsumer(f"tcp://localhost:{_PORT}",
                          deserializer=lambda x: x,
                          sock=client_sock,
