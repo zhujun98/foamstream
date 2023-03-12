@@ -7,20 +7,26 @@ All rights reserved.
 """
 from enum import Enum
 from collections import OrderedDict
-from multiprocessing import Process, Value
 from contextlib import closing
+import logging
+from multiprocessing import Process, Value
 import os.path as osp
 import socket
+import threading
 
 from foamgraph.backend.QtCore import Qt, QTimer, pyqtSignal
-from foamgraph.backend.QtGui import QColor, QFontMetrics, QIntValidator, QMainWindow, QPalette, QValidator
+from foamgraph.backend.QtGui import (
+    QColor, QFont, QFontMetrics, QIntValidator, QMainWindow, QPalette,
+    QValidator
+)
 from foamgraph.backend.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QGridLayout,
-    QHeaderView, QGroupBox, QLabel, QLineEdit, QLCDNumber, QProgressBar,
-    QPushButton, QSlider, QSplitter, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QHBoxLayout, QWidget, QDoubleSpinBox, QStackedWidget
+    QHeaderView, QGroupBox, QLabel, QLineEdit, QLCDNumber, QPlainTextEdit,
+    QProgressBar, QPushButton, QSlider, QSplitter, QTableWidget,
+    QTableWidgetItem, QVBoxLayout, QHBoxLayout, QWidget, QDoubleSpinBox,
+    QStackedWidget
 )
-from foamgraph import createIconButton, GuiLoggingHandler, SmartLineEdit
+from foamgraph import createIconButton, SmartLineEdit
 
 from extra_data import RunDirectory, open_run
 
@@ -38,6 +44,29 @@ class RunData(Enum):
 class DataSelector(Enum):
     RUN_DIR = "Run directory"
     RUN_NUMBER = "Proposal/run number"
+
+
+class GuiLoggingHandler(logging.Handler):
+    def __init__(self, parent):
+        super().__init__(level=logging.INFO)
+        self.widget = QPlainTextEdit(parent)
+
+        formatter = logging.Formatter('[%(levelname)s] %(message)s')
+        self.setFormatter(formatter)
+
+        logger_font = QFont()
+        logger_font.setPointSize(11)
+        self.widget.setFont(logger_font)
+
+        self.widget.setReadOnly(True)
+        self.widget.setMaximumBlockCount(500)
+
+    def emit(self, record):
+        """Override."""
+        # guard logger from other threads
+        if threading.current_thread() is threading.main_thread():
+            self.widget.appendPlainText(self.format(record))
+
 
 
 class FileStreamCtrlWidget(QWidget):
@@ -224,7 +253,7 @@ class FileStreamCtrlWidget(QWidget):
         progress_layout.addWidget(self.tid_progress_br, 3, 1)
         progress_layout.addWidget(self.tid_end_sld, 3, 2)
         progress.setLayout(progress_layout)
-        progress.setFixedHeight(progress.minimumSizeHint().height())
+        # progress.setFixedHeight(progress.minimumSizeHint().height())
 
         table_area = QSplitter()
         sp_sub = QSplitter(Qt.Orientation.Vertical)
