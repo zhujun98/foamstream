@@ -26,13 +26,14 @@ dependencies = [
     'h5py>=3.7.0',
     'numpy',
     'pyzmq>=24.0.0',
+    'avro >= 1.11.2',
+    'foamclient>=0.1.4'
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest",
     "pytest-cov",
-    "foamclient"
 ]
 euxfel = [
     "foamgraph",
@@ -47,6 +48,7 @@ foamstream-debye = "foamstream.sls.debye:main"
 
 [tool.setuptools.package-data]
 "foamstream.euxfel.icons" = ["*.png"]
+"foamstream.sls.schemas" = ["*.json"]
 
 [project.urls]
 repository = "https://github.com/zhujun98/foamstream"

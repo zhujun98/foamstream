@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 
 import numpy as np
+import avro.schema
 
 from ..streamer import Streamer, SerializerType
 
@@ -46,8 +47,11 @@ def main():
 
     args = parser.parse_args()
 
+    schema = avro.schema.from_path(Path(__file__).parent.joinpath("schemas/debye.json"))
+
     with Streamer(args.port,
-                  serializer=SerializerType.SLS,
+                  serializer=SerializerType.AVRO,
+                  schema=schema,
                   sock=args.sock) as streamer:
         # The following parameters should be included in meta data
         data_rate = 10  # data rate in Hz
@@ -62,8 +66,16 @@ def main():
                 idx += 1
                 streamer.feed({
                     "index": idx,  # for debug
-                    "samples": samples[:, i * npts:(i + 1) * npts],
-                    "encoder": encoder[i * npts:(i + 1) * npts]
+                    "samples": {
+                        "data": samples[:, i * npts:(i + 1) * npts].tobytes(),
+                        "dtype": "float",
+                        "shape": [1000]
+                    },
+                    "encoder": {
+                        "data": encoder[i * npts:(i + 1) * npts].tobytes(),
+                        "dtype": "float",
+                        "shape": [1000]
+                    }
                 })
                 time.sleep(1./data_rate)
                 print(f"Data {idx} sent")
