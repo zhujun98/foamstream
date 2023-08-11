@@ -11,7 +11,6 @@ import time
 from typing import Callable, Optional, Union
 
 import zmq
-import avro.schema
 
 from foamclient import create_serializer, SerializerType
 
@@ -19,7 +18,7 @@ from foamclient import create_serializer, SerializerType
 class Streamer:
     def __init__(self, port: int, *,
                  serializer: Union[SerializerType, Callable] = SerializerType.AVRO,
-                 schema: Optional[avro.schema.Schema] = None,
+                 schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
                  request: bytes = b"READY",

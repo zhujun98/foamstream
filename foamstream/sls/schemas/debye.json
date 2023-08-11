@@ -10,27 +10,27 @@
     {
       "name": "encoder",
       "type": {
-        "type": "record",
-        "name": "Encoder",
-        "logicalType": "ndarray",
-        "fields": [
-          {"name": "shape", "type": {"items": "int", "type": "array"}},
-          {"name": "dtype", "type": "string"},
-          {"name": "data", "type": "bytes"}
-        ]
+          "type": "record",
+          "logicalType": "ndarray",
+          "name": "NDArray",
+          "fields": [
+              {"name": "shape", "type": {"items": "int", "type": "array"}},
+              {"name": "dtype", "type": "string"},
+              {"name": "data", "type": "bytes"}
+          ]
       }
     },
     {
       "name": "samples",
       "type": {
-        "type": "record",
-        "name": "Samples",
-        "logicalType": "ndarray",
-        "fields": [
-          {"name": "shape", "type": {"items": "int", "type": "array"}},
-          {"name": "dtype", "type": "string"},
-          {"name": "data", "type": "bytes"}
-        ]
+          "type": "record",
+          "logicalType": "ndarray",
+          "name": "NDArray",
+          "fields": [
+              {"name": "shape", "type": {"items": "int", "type": "array"}},
+              {"name": "dtype", "type": "string"},
+              {"name": "data", "type": "bytes"}
+          ]
       }
     }
   ]

@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 import json
 
-import avro.schema
+import fastavro
 import numpy as np
+
+from foamclient import AvroSchema
 
 
 class AbstractDataGenerator(ABC):
@@ -24,7 +26,7 @@ class StringDataGenerator(AbstractDataGenerator):
 
 
 class AvroDataGenerator(AbstractDataGenerator):
-    schema = avro.schema.parse(json.dumps({
+    schema = fastavro.parse_schema({
         "namespace": "unittest",
         "type": "record",
         "name": "test_data",
@@ -39,19 +41,10 @@ class AvroDataGenerator(AbstractDataGenerator):
             },
             {
                 "name": "array1d",
-                "type": {
-                    "type": "record",
-                    "logicalType": "ndarray",
-                    "name": "Array1D",
-                    "fields": [
-                        {"name": "shape", "type": {"items": "int", "type": "array"}},
-                        {"name": "dtype", "type": "string"},
-                        {"name": "data", "type": "bytes"}
-                    ]
-                }
+                "type": AvroSchema.ndarray
             },
         ]
-    }))
+    })
 
     def next(self):
         data = {
@@ -71,6 +64,7 @@ def assert_result_equal(left, right):
             if isinstance(v, np.ndarray):
                 np.testing.assert_array_equal(v, right[k])
             else:
-                assert v == right[k]
+                assert_result_equal(v, right[k])
     else:
         assert left == right
+
