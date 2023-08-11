@@ -4,7 +4,7 @@ import json
 import fastavro
 import numpy as np
 
-from foamclient import AvroSchema
+from foamclient import AvroSchemaExt
 
 
 class AbstractDataGenerator(ABC):
@@ -41,7 +41,7 @@ class AvroDataGenerator(AbstractDataGenerator):
             },
             {
                 "name": "array1d",
-                "type": AvroSchema.ndarray
+                "type": AvroSchemaExt.ndarray
             },
         ]
     })
