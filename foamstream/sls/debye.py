@@ -9,9 +9,11 @@ import argparse
 from pathlib import Path
 import time
 
+from fastavro.schema import load_schema
 import numpy as np
+from foamclient import SerializerType
 
-from ..streamer import Streamer, SerializerType
+from ..streamer import Streamer
 
 
 def read_sample_data(sampling_rate: float = 1):
@@ -46,8 +48,11 @@ def main():
 
     args = parser.parse_args()
 
+    schema = load_schema(Path(__file__).parent.joinpath("schemas/debye"))
+
     with Streamer(args.port,
-                  serializer=SerializerType.SLS,
+                  serializer=SerializerType.AVRO,
+                  schema=schema,
                   sock=args.sock) as streamer:
         # The following parameters should be included in meta data
         data_rate = 10  # data rate in Hz

@@ -1,0 +1,28 @@
+{
+  "namespace": "debye",
+  "type": "record",
+  "name": "raw",
+  "fields": [
+    {
+      "name": "index",
+      "type": "long"
+    },
+    {
+      "name": "encoder",
+      "type": {
+          "type": "record",
+          "logicalType": "ndarray",
+          "name": "NDArray",
+          "fields": [
+              {"name": "shape", "type": {"items": "int", "type": "array"}},
+              {"name": "dtype", "type": "string"},
+              {"name": "data", "type": "bytes"}
+          ]
+      }
+    },
+    {
+      "name": "samples",
+      "type": "debye.NDArray"
+    }
+  ]
+}

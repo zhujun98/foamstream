@@ -8,16 +8,17 @@ Author: Jun Zhu <jun.zhu@psi.ch>
 from queue import Empty, Queue
 from threading import Event, Thread
 import time
-from typing import Any, Callable, Optional, Union
+from typing import Callable, Optional, Union
 
 import zmq
 
-from .serializer import create_serializer, SerializerType
+from foamclient import create_serializer, SerializerType
 
 
 class Streamer:
     def __init__(self, port: int, *,
-                 serializer: Optional[Union[SerializerType, Callable]] = None,
+                 serializer: Union[SerializerType, Callable] = SerializerType.AVRO,
+                 schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
                  request: bytes = b"READY",
@@ -28,6 +29,7 @@ class Streamer:
         :param port: port of the ZMQ server.
         :param serializer: serializer type or a callable object which serializes
             the data.
+        :param schema: optional data schema for the serializer.
         :param sock: socket type of the ZMQ server.
         :param recv_timeout: maximum time in seconds before a recv operation raises
             zmq.error.Again.
@@ -54,12 +56,10 @@ class Streamer:
         else:
             raise ValueError('Unsupported ZMQ socket type: %s' % str(sock))
 
-        if serializer is None:
-            self._pack = lambda x: x
-        elif callable(serializer):
+        if callable(serializer):
             self._pack = serializer
         else:
-            self._pack = create_serializer(serializer)
+            self._pack = create_serializer(serializer, schema)
 
         self._buffer = Queue(maxsize=buffer_size)
 
@@ -76,7 +76,7 @@ class Streamer:
         socket.bind(f"tcp://*:{self._port}")
         return socket
 
-    def feed(self, data: Any) -> None:
+    def feed(self, data: object) -> None:
         self._buffer.put(data)
 
     def start(self) -> None:
@@ -95,6 +95,8 @@ class Streamer:
                     rep_ready = True
                 except zmq.error.Again:
                     continue
+                except zmq.error.ContextTerminated:
+                    break
 
             try:
                 payload = self._pack(self._buffer.get(timeout=0.1))
