@@ -46,9 +46,6 @@ class Streamer:
         self._ctx = zmq.Context()
         self._recv_timeout = int(recv_timeout * 1000)
         self._request = request
-
-        if multipart and serializer == SerializerType.AVRO:
-            raise ValueError("Avro serializer does not support multipart message")
         self._multipart = multipart
 
         self._hwm = 1
@@ -107,16 +104,14 @@ class Streamer:
                     break
 
             try:
-                data = self._buffer.get(timeout=0.1)
+                payload = self._pack(self._buffer.get(timeout=0.1))
                 if self._multipart:
-                    payload = self._pack(data)
                     for i, item in enumerate(payload):
                         if i == len(payload) - 1:
                             socket.send(item)
                         else:
                             socket.send(item, zmq.SNDMORE)
                 else:
-                    payload = self._pack(data)
                     socket.send(payload)
 
                 if self._sock_type == zmq.REP:

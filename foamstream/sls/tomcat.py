@@ -18,11 +18,6 @@ from ..streamer import Streamer
 sentinel = object()
 
 
-def pack(item: tuple):
-    meta, data = item
-    return json.dumps(meta).encode("utf8"), data
-
-
 # def send(socket, queue):
 #     t_start = t0
 #     byte_sent = 0
@@ -191,6 +186,10 @@ def main():
     args = parser.parse_args()
 
     datafile = parse_datafile(args.datafile)
+
+    def pack(item_: tuple):
+        meta, data = item_
+        return json.dumps(meta).encode("utf8"), data
 
     with Streamer(args.port,
                   serializer=pack,
