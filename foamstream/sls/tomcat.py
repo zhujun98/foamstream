@@ -7,22 +7,60 @@ Author: Jun Zhu <jun.zhu@psi.ch>
 """
 import argparse
 from collections import deque
-from queue import Queue
-from threading import Thread
-import time
+import json
 
 import numpy as np
-import zmq
 import h5py
 
 from ..streamer import Streamer
 
 
 sentinel = object()
-frange = None
 
 
-def shuffled_range(start, end):
+def pack(item: tuple):
+    meta, data = item
+    return json.dumps(meta).encode("utf8"), data
+
+
+# def send(socket, queue):
+#     t_start = t0
+#     byte_sent = 0
+#     total_byte_sent = 0
+#     counter = 0
+#     to_mb = 1024. * 1024.
+#     print_every = 100
+#     while True:
+#         meta, data = queue.get()
+#
+#         if data is sentinel:
+#             break
+#
+#         socket.send_json(meta, flags=zmq.SNDMORE)
+#         socket.send(data)
+#
+#         counter += 1
+#         byte_sent += data.nbytes
+#         total_byte_sent += data.nbytes
+#         if counter % print_every == 0:
+#             print(f"Sent type {meta['image_attributes']['scan_index']}, "
+#                   f"frame {meta['frame']}")
+#
+#             dt = time.time() - t0
+#             print(f"Number of data sent: {counter:>6d}, "
+#                   f"throughput: {byte_sent / dt / to_mb:>6.1f} MB/s")
+#             t0 = time.time()
+#             byte_sent = 0
+#
+#     dt = time.time() - t_start
+#     print(f"Total number of data sent: {counter:>6d}, "
+#           f"average throughput: {total_byte_sent / dt / to_mb:>6.1f} MB/s")
+
+
+def gen_index(start: int, end: int, ordered: bool = True):
+    if ordered:
+        yield from range(start, end)
+
     prob = [0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05]
     q = deque()
     for i in range(start, end):
@@ -37,42 +75,7 @@ def shuffled_range(start, end):
         yield idx
 
 
-def send(socket, queue):
-    t0 = time.time()
-    t_start = t0
-    byte_sent = 0
-    total_byte_sent = 0
-    counter = 0
-    to_mb = 1024. * 1024.
-    print_every = 100
-    while True:
-        meta, data = queue.get()
-
-        if data is sentinel:
-            break
-
-        socket.send_json(meta, flags=zmq.SNDMORE)
-        socket.send(data)
-
-        counter += 1
-        byte_sent += data.nbytes
-        total_byte_sent += data.nbytes
-        if counter % print_every == 0:
-            print(f"Sent type {meta['image_attributes']['scan_index']}, "
-                  f"frame {meta['frame']}")
-
-            dt = time.time() - t0
-            print(f"Number of data sent: {counter:>6d}, "
-                  f"throughput: {byte_sent / dt / to_mb:>6.1f} MB/s")
-            t0 = time.time()
-            byte_sent = 0
-
-    dt = time.time() - t_start
-    print(f"Total number of data sent: {counter:>6d}, "
-          f"average throughput: {total_byte_sent / dt / to_mb:>6.1f} MB/s")
-
-
-def gen_meta(scan_index, frame_index, shape):
+def create_meta(scan_index, frame_index, shape):
     return {
         'image_attributes': {
             'scan_index': scan_index,
@@ -96,8 +99,8 @@ def gen_fake_data(scan_index, n, *, shape):
     if n == 0:
         n = 500
 
-    for i in frange(0, n):
-        meta = gen_meta(scan_index, i, shape)
+    for i in gen_index(0, n):
+        meta = create_meta(scan_index, i, shape)
         if scan_index == 0:
             data = darks[np.random.choice(len(darks))]
         elif scan_index == 1:
@@ -128,8 +131,8 @@ def stream_data_file(filepath,  scan_index, *,
         if start == end:
             end = start + n_images
 
-        for i in frange(start, end):
-            meta = gen_meta(scan_index, i, shape)
+        for i in gen_index(start, end):
+            meta = create_meta(scan_index, i, shape)
             # Repeating reading data from chunks if data size is smaller
             # than the index range.
             data = np.zeros(shape, dtype=np.uint16)
@@ -190,11 +193,9 @@ def main():
     datafile = parse_datafile(args.datafile)
 
     with Streamer(args.port,
-                  serializer=lambda x: x,
+                  serializer=pack,
+                  multipart=True,
                   sock=args.sock) as streamer:
-
-        global frange
-        frange = range if args.ordered else shuffled_range
 
         if datafile:
             print(f"Streaming data from {datafile} ...")
@@ -203,18 +204,19 @@ def main():
 
         for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
             if not datafile:
-                item = gen_fake_data(scan_index, n, shape=(args.rows, args.cols))
+                gen = gen_fake_data(scan_index, n, shape=(args.rows, args.cols))
             else:
                 if scan_index == 2:
-                    item = stream_data_file(datafile, scan_index,
-                                            start=args.start,
-                                            end=args.start + n)
+                    gen = stream_data_file(datafile, scan_index,
+                                           start=args.start,
+                                           end=args.start + n)
                 else:
-                    item = stream_data_file(datafile, scan_index,
-                                            start=0,
-                                            end=n)
+                    gen = stream_data_file(datafile, scan_index,
+                                           start=0,
+                                           end=n)
 
-            streamer.feed(item)
+            for item in gen:
+                streamer.feed(item)
 
 
 if __name__ == "__main__":

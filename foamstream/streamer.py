@@ -21,6 +21,7 @@ class Streamer:
                  schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
+                 multipart: bool = False,
                  request: bytes = b"READY",
                  buffer_size: int = 10,
                  daemon: bool = False):
@@ -33,6 +34,7 @@ class Streamer:
         :param sock: socket type of the ZMQ server.
         :param recv_timeout: maximum time in seconds before a recv operation raises
             zmq.error.Again.
+        :param multipart: whether the data will be sent as a multipart message.
         :param request: acknowledgement expected from the REQ server when the socket
             type is REP.
         :param buffer_size: size of the internal buffer for holding the data
@@ -44,6 +46,11 @@ class Streamer:
         self._ctx = zmq.Context()
         self._recv_timeout = int(recv_timeout * 1000)
         self._request = request
+
+        if multipart and serializer == SerializerType.AVRO:
+            raise ValueError("Avro serializer does not support multipart message")
+        self._multipart = multipart
+
         self._hwm = 1
 
         sock = sock.upper()
@@ -59,7 +66,8 @@ class Streamer:
         if callable(serializer):
             self._pack = serializer
         else:
-            self._pack = create_serializer(serializer, schema)
+            self._pack = create_serializer(
+                serializer, schema, multipart=multipart)
 
         self._buffer = Queue(maxsize=buffer_size)
 
@@ -99,8 +107,18 @@ class Streamer:
                     break
 
             try:
-                payload = self._pack(self._buffer.get(timeout=0.1))
-                socket.send(payload)
+                data = self._buffer.get(timeout=0.1)
+                if self._multipart:
+                    payload = self._pack(data)
+                    for i, item in enumerate(payload):
+                        if i == len(payload) - 1:
+                            socket.send(item)
+                        else:
+                            socket.send(item, zmq.SNDMORE)
+                else:
+                    payload = self._pack(data)
+                    socket.send(payload)
+
                 if self._sock_type == zmq.REP:
                     rep_ready = False
             except Empty:
