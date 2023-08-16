@@ -138,17 +138,21 @@ def stream_data_file(filepath,  scan_index, *,
             yield meta, data
 
 
-def parse_datafile(name: str):
+def parse_datafile(name: str) -> str:
+    p19730 = "/das/work/p19/p19730/recastx_example_data"
     if name in ["pet1", "pet2", "pet3"]:
         # number of projections per scan: 400, 500, 500
+        # "/sls/X02DA/Data10/e16816/disk1/PET_55um_40_{idx}/PET_55um_40_{idx}.h5
         idx = name[-1]
-        return f"/sls/X02DA/Data10/e16816/disk1/PET_55um_40_{idx}/PET_55um_40_{idx}.h5"
+        return f"{p19730}/e16816/PET_55um_40_{idx}/PET_55um_40_{idx}.h5"
     if name == "asm":
         # number of projections per scan: 400
-        return f"/sls/X02DA/Data10/e16816/disk1/15_ASM_UA_ASM/15_ASM_UA_ASM.h5"
+        # /sls/X02DA/Data10/e16816/disk1/15_ASM_UA_ASM/15_ASM_UA_ASM.h5
+        return f"{p19730}/e16816/15_ASM_UA_ASM.h5"
     if name == "h1":
         # number of projections per scan: 500
-        return f"/sls/X02DA/Data10/e16816/disk1/32_050_300_H1/32_050_300_H1.h5"
+        # /sls/X02DA/Data10/e16816/disk1/32_050_300_H1/32_050_300_H1.h5
+        return f"{p19730}/e16816/32_050_300_H1.h5"
     return name
 
 
