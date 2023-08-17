@@ -21,9 +21,11 @@ class Streamer:
                  schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
+                 multipart: bool = False,
                  request: bytes = b"READY",
                  buffer_size: int = 10,
-                 daemon: bool = False):
+                 daemon: bool = False,
+                 early_serialization: bool = False):
         """Initialization.
 
         :param port: port of the ZMQ server.
@@ -33,6 +35,7 @@ class Streamer:
         :param sock: socket type of the ZMQ server.
         :param recv_timeout: maximum time in seconds before a recv operation raises
             zmq.error.Again.
+        :param multipart: whether the data will be sent as a multipart message.
         :param request: acknowledgement expected from the REQ server when the socket
             type is REP.
         :param buffer_size: size of the internal buffer for holding the data
@@ -44,6 +47,8 @@ class Streamer:
         self._ctx = zmq.Context()
         self._recv_timeout = int(recv_timeout * 1000)
         self._request = request
+        self._multipart = multipart
+
         self._hwm = 1
 
         sock = sock.upper()
@@ -59,12 +64,15 @@ class Streamer:
         if callable(serializer):
             self._pack = serializer
         else:
-            self._pack = create_serializer(serializer, schema)
+            self._pack = create_serializer(
+                serializer, schema, multipart=multipart)
 
         self._buffer = Queue(maxsize=buffer_size)
 
         self._thread = Thread(target=self._run, daemon=daemon)
         self._ev = Event()
+
+        self._early_serialization = early_serialization
 
     def _init_socket(self):
         # It is not necessary to set HWM here since the number of messages is bound by
@@ -77,6 +85,8 @@ class Streamer:
         return socket
 
     def feed(self, data: object) -> None:
+        if self._early_serialization:
+            data = self._pack(data)
         self._buffer.put(data)
 
     def start(self) -> None:
@@ -99,8 +109,19 @@ class Streamer:
                     break
 
             try:
-                payload = self._pack(self._buffer.get(timeout=0.1))
-                socket.send(payload)
+                data = self._buffer.get(timeout=0.1)
+                if not self._early_serialization:
+                    data = self._pack(data)
+
+                if self._multipart:
+                    for i, item in enumerate(data):
+                        if i == len(data) - 1:
+                            socket.send(item)
+                        else:
+                            socket.send(item, zmq.SNDMORE)
+                else:
+                    socket.send(data)
+
                 if self._sock_type == zmq.REP:
                     rep_ready = False
             except Empty:
