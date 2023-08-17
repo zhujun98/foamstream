@@ -15,7 +15,10 @@ import zmq
 from foamclient import create_serializer, SerializerType
 
 
+_reset_counter_sentinel = object()
+
 class Streamer:
+
     def __init__(self, port: int, *,
                  serializer: Union[SerializerType, Callable] = SerializerType.AVRO,
                  schema: Optional[object] = None,
@@ -25,7 +28,8 @@ class Streamer:
                  request: bytes = b"READY",
                  buffer_size: int = 10,
                  daemon: bool = False,
-                 early_serialization: bool = False):
+                 early_serialization: bool = False,
+                 report_every: int = 100):
         """Initialization.
 
         :param port: port of the ZMQ server.
@@ -42,6 +46,8 @@ class Streamer:
             to be sent.
         :param daemon: True for making the thread in which the socket runs a daemon
             thread.
+        :param early_serialization:
+        :param report_every:
         """
         self._port = port
         self._ctx = zmq.Context()
@@ -74,6 +80,9 @@ class Streamer:
 
         self._early_serialization = early_serialization
 
+        self._counter = 0
+        self._report_every = report_every
+
     def _init_socket(self):
         # It is not necessary to set HWM here since the number of messages is bound by
         # the buffer size. Btw. setting hwm to 1 could result in message loss in
@@ -91,6 +100,20 @@ class Streamer:
 
     def start(self) -> None:
         self._thread.start()
+
+    def _send(self, socket, payload):
+        if self._multipart:
+            for i, item in enumerate(payload):
+                if i == len(payload) - 1:
+                    socket.send(item)
+                else:
+                    socket.send(item, zmq.SNDMORE)
+        else:
+            socket.send(payload)
+
+        self._counter += 1
+        if self._report_every > 0 and self._counter % self._report_every == 0:
+            print(f"Number of items sent: {self._counter:>6d}")
 
     def _run(self) -> None:
         socket = self._init_socket()
@@ -110,17 +133,13 @@ class Streamer:
 
             try:
                 data = self._buffer.get(timeout=0.1)
+                if data == _reset_counter_sentinel:
+                    self.__reset_counter()
+                    continue
+
                 if not self._early_serialization:
                     data = self._pack(data)
-
-                if self._multipart:
-                    for i, item in enumerate(data):
-                        if i == len(data) - 1:
-                            socket.send(item)
-                        else:
-                            socket.send(item, zmq.SNDMORE)
-                else:
-                    socket.send(data)
+                self._send(socket, data)
 
                 if self._sock_type == zmq.REP:
                     rep_ready = False
@@ -141,3 +160,11 @@ class Streamer:
             time.sleep(1.)
         self.stop()
         self._ctx.destroy()
+
+    def __reset_counter(self) -> None:
+        print(f"Number of items sent: {self._counter:>6d}")
+        self._counter = 0
+
+    def reset_counter(self) -> None:
+        self._buffer.put(_reset_counter_sentinel)
+

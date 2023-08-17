@@ -18,19 +18,19 @@ from ..streamer import Streamer
 def gen_index(start: int, end: int, ordered: bool = True):
     if ordered:
         yield from range(start, end)
+    else:
+        prob = [0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05]
+        q = deque()
+        for i in range(start, end):
+            if len(q) == len(prob):
+                idx = np.random.choice(q, p=prob)
+                q.remove(idx)
+                yield int(idx)
+            q.append(i)
 
-    prob = [0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05]
-    q = deque()
-    for i in range(start, end):
-        if len(q) == len(prob):
-            idx = np.random.choice(q, p=prob)
-            q.remove(idx)
-            yield int(idx)
-        q.append(i)
-
-    np.random.shuffle(q)
-    for idx in q:
-        yield idx
+        np.random.shuffle(q)
+        for idx in q:
+            yield idx
 
 
 def create_meta(scan_index, frame_index, shape):
@@ -53,9 +53,6 @@ def gen_fake_data(scan_index, n, *, shape):
               for _ in range(10)]
     projections = [np.random.randint(4096, size=shape, dtype=np.uint16)
                    for _ in range(10)]
-
-    if n == 0:
-        n = 500
 
     for i in gen_index(0, n):
         meta = create_meta(scan_index, i, shape)
@@ -165,7 +162,16 @@ def main():
             print("Streaming randomly generated data ...")
 
         for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
+            if scan_index == 0:
+                print("Streaming darks ...")
+            elif scan_index == 1:
+                print("Streaming flats ...")
+            else:
+                print("Streaming projections ...")
+
             if not datafile:
+                if n == 0:
+                    n = 500
                 gen = gen_fake_data(scan_index, n, shape=(args.rows, args.cols))
             else:
                 if scan_index == 2:
@@ -179,6 +185,9 @@ def main():
 
             for item in gen:
                 streamer.feed(item)
+
+            if scan_index < 2:
+                streamer.reset_counter()
 
 
 if __name__ == "__main__":
