@@ -15,7 +15,6 @@ if __name__ == "__main__":
     with ZmqConsumer(f"tcp://localhost:9667",
                      deserializer=unpack,
                      sock="PULL",
-                     multipart=True,
-                     timeout=1.0) as consumer:
+                     multipart=True) as consumer:
         for _ in range(10):
             print(consumer.next())
