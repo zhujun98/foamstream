@@ -17,6 +17,7 @@ from foamclient import create_serializer, SerializerType
 
 _reset_counter_sentinel = object()
 
+
 class Streamer:
 
     def __init__(self, port: int, *,
@@ -26,6 +27,7 @@ class Streamer:
                  recv_timeout: float = 0.1,
                  multipart: bool = False,
                  request: bytes = b"READY",
+                 hwm: Optional[int] = None,
                  buffer_size: int = 10,
                  daemon: bool = False,
                  early_serialization: bool = False,
@@ -42,6 +44,7 @@ class Streamer:
         :param multipart: whether the data will be sent as a multipart message.
         :param request: acknowledgement expected from the REQ server when the socket
             type is REP.
+        :param hwm: high water mark in ZMQ.
         :param buffer_size: size of the internal buffer for holding the data
             to be sent.
         :param daemon: True for making the thread in which the socket runs a daemon
@@ -57,8 +60,6 @@ class Streamer:
         self._request = request
         self._multipart = multipart
 
-        self._hwm = 1
-
         sock = sock.upper()
         if sock == 'PUSH':
             self._sock_type = zmq.PUSH
@@ -68,6 +69,8 @@ class Streamer:
             self._sock_type = zmq.PUB
         else:
             raise ValueError('Unsupported ZMQ socket type: %s' % str(sock))
+
+        self._hwm = 1000 if hwm is None else hwm
 
         if callable(serializer):
             self._pack = serializer
@@ -86,12 +89,10 @@ class Streamer:
         self._report_every = report_every
 
     def _init_socket(self):
-        # It is not necessary to set HWM here since the number of messages is bound by
-        # the buffer size. Btw. setting hwm to 1 could result in message loss in
-        # pub-sub connection.
         socket = self._ctx.socket(self._sock_type)
         socket.setsockopt(zmq.LINGER, 0)
         socket.setsockopt(zmq.RCVTIMEO, self._recv_timeout)
+        socket.set_hwm(self._hwm)
         socket.bind(f"tcp://*:{self._port}")
         return socket
 
