@@ -104,8 +104,7 @@ def stream_data_file(filepath,  scan_index, *, start, end, ordered):
 def parse_datafile(name: str, root: str) -> str:
     if name in ["pet1", "pet2", "pet3"]:
         # "/sls/X02DA/Data10/e16816/disk1/PET_55um_40_{idx}/PET_55um_40_{idx}.h5
-        idx = name[-1]
-        return f"{root}/e16816/PET_55um_40_{idx}.h5"
+        return f"{root}/e16816/PET_55um_40_{name[-1]}.h5"
     if name == "asm":
         # /sls/X02DA/Data10/e16816/disk1/15_ASM_UA_ASM/15_ASM_UA_ASM.h5
         return f"{root}/e16816/15_ASM_UA_ASM.h5"
@@ -114,6 +113,10 @@ def parse_datafile(name: str, root: str) -> str:
         return f"{root}/e16816/32_050_300_H1.h5"
     if name == "foam":
         return f"{root}/tomobank/dk_MCFG_1_p_s1_.h5"
+    if name == "fuel0":
+        return f"{root}/tomobank/fuelcell_dryHQ_i1.h5"
+    if name in ["fuel1", "fuel2", "fuel3"]:
+        return f"{root}/tomobank/fuelcell_i{name[-1]}.h5"
     return name
 
 
@@ -151,7 +154,12 @@ def main():
                              "> pet3 - shape: 201 x 500 x 600 x 576, sample: PET_55um_40_3, source: TOMCAT (e16816)\n"
                              "> asm - shape: 1001 x 400 x 520 x 768, sample: 15_ASM_UA_ASM, source: TOMCAT (e16816)\n"
                              "> h1 - shape: 142 x 500 x 2016 x 288, sample: 32_050_300_H1, source: TOMCAT (e16816)\n"
-                             "> foam - shape: 130 x 300 x 1800 x 2016, sample: dk_MCFG_1_p_s1, source: Tomobank")
+                             "> foam - shape: 130 x 300 x 1800 x 2016, sample: dk_MCFG_1_p_s1, source: Tomobank\n"
+                             "> fuel0 - shape: 1 x 1001 x 1100 x 1440, sample: fuelcell_dryHQ_i1, source: Tomobank\n"
+                             "> fuel1 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i1, source: Tomobank\n"
+                             "> fuel2 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i2, source: Tomobank\n"
+                             "> fuel3 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i3, source: Tomobank\n"
+                             )
     parser.add_argument('--datafile-root', type=str,
                         default="/das/work/p19/p19730/recastx_example_data",
                         help="Root directory of the data file")
