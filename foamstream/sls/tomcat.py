@@ -66,18 +66,23 @@ def gen_fake_data(scan_index, n, *, shape):
         yield meta, data
 
 
-def stream_data_file(filepath,  scan_index, *,
-                     start, end):
+def stream_data_file(filepath,  scan_index, *, start, end):
+    p_dark = "/exchange/data_dark"
+    p_flats = "/exchange/data_white"
+    p_projections = "/exchange/data"
+
     with h5py.File(filepath, "r") as fp:
+        print(f"Data shapes - "
+              f"dark: {fp[p_dark].shape}, "
+              f"flat: {fp[p_flats].shape}, "
+              f"projection: {fp[p_projections].shape}")
+
         if scan_index == 0:
-            ds = fp["/exchange/data_dark"]
-            print(f"Dark data shape: {ds.shape}")
+            ds = fp[p_dark]
         elif scan_index == 1:
-            ds = fp["/exchange/data_white"]
-            print(f"Flat data shape: {ds.shape}")
+            ds = fp[p_flats]
         elif scan_index == 2:
-            ds = fp["/exchange/data"]
-            print(f"Projection data shape: {ds.shape}")
+            ds = fp[p_projections]
         else:
             raise ValueError(f"Unsupported scan_index: {scan_index}")
 
@@ -96,26 +101,28 @@ def stream_data_file(filepath,  scan_index, *,
             yield meta, data
 
 
-def parse_datafile(name: str) -> str:
-    p19730 = "/das/work/p19/p19730/recastx_example_data"
+def parse_datafile(name: str, root: str) -> str:
     if name in ["pet1", "pet2", "pet3"]:
         # number of projections per scan: 400, 500, 500
         # "/sls/X02DA/Data10/e16816/disk1/PET_55um_40_{idx}/PET_55um_40_{idx}.h5
         idx = name[-1]
-        return f"{p19730}/e16816/PET_55um_40_{idx}/PET_55um_40_{idx}.h5"
+        return f"{root}/e16816/PET_55um_40_{idx}.h5"
     if name == "asm":
         # number of projections per scan: 400
         # /sls/X02DA/Data10/e16816/disk1/15_ASM_UA_ASM/15_ASM_UA_ASM.h5
-        return f"{p19730}/e16816/15_ASM_UA_ASM.h5"
+        return f"{root}/e16816/15_ASM_UA_ASM.h5"
     if name == "h1":
         # number of projections per scan: 500
         # /sls/X02DA/Data10/e16816/disk1/32_050_300_H1/32_050_300_H1.h5
-        return f"{p19730}/e16816/32_050_300_H1.h5"
+        return f"{root}/e16816/32_050_300_H1.h5"
     return name
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Fake GigaFrost Data Stream')
+    parser = argparse.ArgumentParser(
+        description='Fake GigaFrost Data Stream',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
     parser.add_argument('--port', default="9667", type=int,
                         help="ZMQ socket port (default=9667)")
@@ -139,13 +146,20 @@ def main():
     parser.add_argument('--cols', default=2016, type=int,
                         help="Number of columns of the generated image (default=2016)")
     parser.add_argument('--datafile', type=str,
-                        help="Path or code of the data file. Available codes "
-                             "with number of projection denoted in the bracket are: "
-                             "pet1 (400), pet2 (500), pet3 (500), asm (400), h1 (500)")
+                        help="Path or code of the data file. Available codes are: \n"
+                             "> pet1 - shape: 501 x 400 x 800 x 384, sample: PET_55um_40_1, source: TOMCAT (e16816)\n"
+                             "> pet2 - shape: 201 x 500 x 1008 x 1008, sample: PET_55um_40_2, source: TOMCAT (e16816)\n"
+                             "> pet3 - shape: 201 x 500 x 600 x 576, sample: PET_55um_40_3, source: TOMCAT (e16816)\n"
+                             "> asm - shape: 1001 x 400 x 520 x 768, sample: 15_ASM_UA_ASM, source: TOMCAT (e16816)\n"
+                             "> h1 - shape: 142 x 500 x 2016 x 288, sample: 32_050_300_H1, source: TOMCAT (e16816)\n"
+                             "> foam - shape: 130 x 300 x , sample: dk_MCFG_1_p_s1, source: Tomobank")
+    parser.add_argument('--datafile-root', type=str,
+                        default="/das/work/p19/p19730/recastx_example_data",
+                        help="Root directory of the data file")
 
     args = parser.parse_args()
 
-    datafile = parse_datafile(args.datafile)
+    datafile = parse_datafile(args.datafile, args.datafile_root)
 
     def pack(item_: tuple):
         meta, data = item_
