@@ -67,3 +67,21 @@ def test_zmq_streamer_with_multipart_message(serializer, deserializer):
                          timeout=1.0) as client:
             streamer.feed(data_gt)
             assert client.next() == [{'a': 123}, {'b': 'Hello world'}]
+
+
+@pytest.mark.parametrize("early_serialization", [True, False])
+def test_zmq_streamer_early_serialization(early_serialization):
+    gen = AvroDataGenerator()
+
+    with Streamer(_PORT,
+                  sock="PUSH",
+                  schema=gen.schema,
+                  early_serialization=early_serialization) as streamer:
+        with ZmqConsumer(f"tcp://localhost:{_PORT}",
+                         sock="PULL",
+                         schema=gen.schema,
+                         timeout=1.0) as client:
+
+            data_gt = gen.next()
+            streamer.feed(data_gt)
+            assert_result_equal(client.next(), data_gt)

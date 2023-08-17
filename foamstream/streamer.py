@@ -24,7 +24,8 @@ class Streamer:
                  multipart: bool = False,
                  request: bytes = b"READY",
                  buffer_size: int = 10,
-                 daemon: bool = False):
+                 daemon: bool = False,
+                 early_serialization: bool = False):
         """Initialization.
 
         :param port: port of the ZMQ server.
@@ -71,6 +72,8 @@ class Streamer:
         self._thread = Thread(target=self._run, daemon=daemon)
         self._ev = Event()
 
+        self._early_serialization = early_serialization
+
     def _init_socket(self):
         # It is not necessary to set HWM here since the number of messages is bound by
         # the buffer size. Btw. setting hwm to 1 could result in message loss in
@@ -82,6 +85,8 @@ class Streamer:
         return socket
 
     def feed(self, data: object) -> None:
+        if self._early_serialization:
+            data = self._pack(data)
         self._buffer.put(data)
 
     def start(self) -> None:
@@ -104,15 +109,18 @@ class Streamer:
                     break
 
             try:
-                payload = self._pack(self._buffer.get(timeout=0.1))
+                data = self._buffer.get(timeout=0.1)
+                if not self._early_serialization:
+                    data = self._pack(data)
+
                 if self._multipart:
-                    for i, item in enumerate(payload):
-                        if i == len(payload) - 1:
+                    for i, item in enumerate(data):
+                        if i == len(data) - 1:
                             socket.send(item)
                         else:
                             socket.send(item, zmq.SNDMORE)
                 else:
-                    socket.send(payload)
+                    socket.send(data)
 
                 if self._sock_type == zmq.REP:
                     rep_ready = False
