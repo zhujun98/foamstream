@@ -15,43 +15,6 @@ import h5py
 from ..streamer import Streamer
 
 
-sentinel = object()
-
-
-# def send(socket, queue):
-#     t_start = t0
-#     byte_sent = 0
-#     total_byte_sent = 0
-#     counter = 0
-#     to_mb = 1024. * 1024.
-#     print_every = 100
-#     while True:
-#         meta, data = queue.get()
-#
-#         if data is sentinel:
-#             break
-#
-#         socket.send_json(meta, flags=zmq.SNDMORE)
-#         socket.send(data)
-#
-#         counter += 1
-#         byte_sent += data.nbytes
-#         total_byte_sent += data.nbytes
-#         if counter % print_every == 0:
-#             print(f"Sent type {meta['image_attributes']['scan_index']}, "
-#                   f"frame {meta['frame']}")
-#
-#             dt = time.time() - t0
-#             print(f"Number of data sent: {counter:>6d}, "
-#                   f"throughput: {byte_sent / dt / to_mb:>6.1f} MB/s")
-#             t0 = time.time()
-#             byte_sent = 0
-#
-#     dt = time.time() - t_start
-#     print(f"Total number of data sent: {counter:>6d}, "
-#           f"average throughput: {total_byte_sent / dt / to_mb:>6.1f} MB/s")
-
-
 def gen_index(start: int, end: int, ordered: bool = True):
     if ordered:
         yield from range(start, end)
