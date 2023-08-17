@@ -46,8 +46,10 @@ class Streamer:
             to be sent.
         :param daemon: True for making the thread in which the socket runs a daemon
             thread.
-        :param early_serialization:
-        :param report_every:
+        :param early_serialization: If True, the data will be serialized before queued
+            for being sent.
+        :param report_every: the interval of reporting (e.g. print out) the number
+            of data sent.
         """
         self._port = port
         self._ctx = zmq.Context()
