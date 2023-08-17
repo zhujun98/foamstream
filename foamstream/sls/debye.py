@@ -71,7 +71,6 @@ def main():
                     "encoder": encoder[i * npts:(i + 1) * npts]
                 })
                 time.sleep(1./data_rate)
-                print(f"Data {idx} sent")
 
             if not args.repeat:
                 break
