@@ -15,7 +15,7 @@ import h5py
 from ..streamer import Streamer
 
 
-def gen_index(start: int, end: int, ordered: bool = True):
+def gen_index(start: int, end: int, *, ordered: bool = True):
     if ordered:
         yield from range(start, end)
     else:
@@ -46,7 +46,7 @@ def create_meta(scan_index, frame_index, shape):
     }
 
 
-def gen_fake_data(scan_index, n, *, shape):
+def gen_fake_data(scan_index, n, *, shape, ordered):
     darks = [np.random.randint(500, size=shape, dtype=np.uint16)
              for _ in range(10)]
     whites = [3596 + np.random.randint(500, size=shape, dtype=np.uint16)
@@ -54,7 +54,7 @@ def gen_fake_data(scan_index, n, *, shape):
     projections = [np.random.randint(4096, size=shape, dtype=np.uint16)
                    for _ in range(10)]
 
-    for i in gen_index(0, n):
+    for i in gen_index(0, n, ordered=ordered):
         meta = create_meta(scan_index, i, shape)
         if scan_index == 0:
             data = darks[np.random.choice(len(darks))]
@@ -66,7 +66,7 @@ def gen_fake_data(scan_index, n, *, shape):
         yield meta, data
 
 
-def stream_data_file(filepath,  scan_index, *, start, end):
+def stream_data_file(filepath,  scan_index, *, start, end, ordered):
     p_dark = "/exchange/data_dark"
     p_flats = "/exchange/data_white"
     p_projections = "/exchange/data"
@@ -91,7 +91,7 @@ def stream_data_file(filepath,  scan_index, *, start, end):
         if start == end:
             end = start + n_images
 
-        for i in gen_index(start, end):
+        for i in gen_index(start, end, ordered=ordered):
             meta = create_meta(scan_index, i, shape)
             # Repeating reading data from chunks if data size is smaller
             # than the index range.
@@ -138,9 +138,9 @@ def main():
                              "500 otherwise")
     parser.add_argument('--start', default=0, type=int,
                         help="Starting index of the projection images (default=0)")
-    parser.add_argument('--ordered', action='store_true',
-                        help="Send out images with frame IDs in order. "
-                             "Note: enable ordered frame IDs to achieve higher throughput")
+    parser.add_argument('--unordered', action='store_true',
+                        help="Send out images with frame IDs not in order. "
+                             "Note: unordered frame IDs results in lower throughput")
     parser.add_argument('--rows', default=1200, type=int,
                         help="Number of rows of the generated image (default=1200)")
     parser.add_argument('--cols', default=2016, type=int,
@@ -186,16 +186,20 @@ def main():
             if not datafile:
                 if n == 0:
                     n = 500
-                gen = gen_fake_data(scan_index, n, shape=(args.rows, args.cols))
+                gen = gen_fake_data(scan_index, n,
+                                    shape=(args.rows, args.cols),
+                                    ordered=not args.unordered)
             else:
                 if scan_index == 2:
                     gen = stream_data_file(datafile, scan_index,
                                            start=args.start,
-                                           end=args.start + n)
+                                           end=args.start + n,
+                                           ordered=not args.unordered)
                 else:
                     gen = stream_data_file(datafile, scan_index,
                                            start=0,
-                                           end=n)
+                                           end=n,
+                                           ordered=not args.unordered)
 
             for item in gen:
                 streamer.feed(item)

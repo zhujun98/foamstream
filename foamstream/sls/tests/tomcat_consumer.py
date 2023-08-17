@@ -17,4 +17,5 @@ if __name__ == "__main__":
                      sock="PULL",
                      multipart=True,
                      timeout=1.0) as consumer:
-        print(consumer.next())
+        for _ in range(10):
+            print(consumer.next())
