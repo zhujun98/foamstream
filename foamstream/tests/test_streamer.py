@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from foamclient import SerializerType, ZmqConsumer
+from foamclient import ZmqConsumer
 from foamstream import Streamer
 
 from .conftest import assert_result_equal, AvroDataGenerator, StringDataGenerator
@@ -15,12 +15,12 @@ _PORT = 12345
 @pytest.mark.parametrize("daemon", [True, False])
 @pytest.mark.parametrize("server_sock,client_sock", [("PUSH", "PULL"), ("PUB", "SUB"), ("REP", "REQ")])
 @pytest.mark.parametrize(
-    "serializer, deserializer", [(SerializerType.AVRO, SerializerType.AVRO),
-                                 (SerializerType.PICKLE, SerializerType.PICKLE),
+    "serializer, deserializer", [("avro", "avro"),
+                                 ("pickle", "pickle"),
                                  (lambda x: x.encode(), lambda x: x.bytes.decode())])
 def test_zmq_streamer(serializer, deserializer, server_sock, client_sock, daemon):
 
-    if serializer == SerializerType.AVRO:
+    if serializer == "avro":
         gen = AvroDataGenerator()
     else:
         gen = StringDataGenerator()
@@ -44,7 +44,7 @@ def test_zmq_streamer(serializer, deserializer, server_sock, client_sock, daemon
 
 
 @pytest.mark.parametrize(
-    "serializer, deserializer", [(SerializerType.PICKLE, SerializerType.PICKLE),
+    "serializer, deserializer", [("pickle", "pickle"),
                                  (lambda x: (json.dumps(x[0]).encode("utf8"), json.dumps(x[1]).encode("utf8")),
                                   lambda x: [json.loads(x[0].bytes), json.loads(x[1].bytes)])])
 def test_zmq_streamer_with_multipart_message(serializer, deserializer):

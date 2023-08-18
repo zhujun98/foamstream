@@ -11,7 +11,6 @@ import time
 
 from fastavro.schema import load_schema
 import numpy as np
-from foamclient import SerializerType
 
 from ..streamer import Streamer
 
@@ -51,7 +50,7 @@ def main():
     schema = load_schema(Path(__file__).parent.joinpath("schemas/debye"))
 
     with Streamer(args.port,
-                  serializer=SerializerType.AVRO,
+                  serializer="avro",
                   schema=schema,
                   sock=args.sock) as streamer:
         # The following parameters should be included in meta data
