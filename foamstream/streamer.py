@@ -12,7 +12,7 @@ from typing import Callable, Optional, Union
 
 import zmq
 
-from foamclient import create_serializer, SerializerType
+from foamclient import create_serializer
 
 
 _reset_counter_sentinel = object()
@@ -21,7 +21,7 @@ _reset_counter_sentinel = object()
 class Streamer:
 
     def __init__(self, port: int, *,
-                 serializer: Union[SerializerType, Callable] = SerializerType.AVRO,
+                 serializer: Union[str, Callable] = "avro",
                  schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
