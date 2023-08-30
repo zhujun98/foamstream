@@ -2,6 +2,7 @@ import json
 import time
 
 import pytest
+from unittest.mock import patch
 
 from foamclient import ZmqConsumer
 from foamstream import Streamer
@@ -85,3 +86,31 @@ def test_zmq_streamer_early_serialization(early_serialization):
             data_gt = gen.next()
             streamer.feed(data_gt)
             assert_result_equal(client.next(), data_gt)
+
+
+def test_zmq_streamer_report():
+    gen = AvroDataGenerator()
+
+    with Streamer(_PORT,
+                  sock="PUSH",
+                  schema=gen.schema) as streamer:
+        with patch.object(streamer, "_report") as patched:
+            with ZmqConsumer(f"tcp://localhost:{_PORT}",
+                             sock="PULL",
+                             schema=gen.schema,
+                             timeout=1.0) as client:
+                    num_items = streamer._report_every + 1
+                    for _ in range(num_items):
+                        data_gt = gen.next()
+                        streamer.feed(data_gt)
+                        assert_result_equal(client.next(), data_gt)
+                    patched.assert_called_once()
+                    assert streamer._counter == num_items
+                    assert streamer._bytes_sent > 0
+
+                    patched.reset_mock()
+                    streamer.reset_counter()
+                    time.sleep(0.01)
+                    patched.assert_called_once()
+                    assert streamer._counter == 0
+                    assert streamer._bytes_sent == 0

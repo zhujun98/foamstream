@@ -175,7 +175,8 @@ def main():
     with Streamer(args.port,
                   serializer=pack,
                   multipart=True,
-                  sock=args.sock) as streamer:
+                  sock=args.sock,
+                  report_every=1000) as streamer:
 
         if datafile:
             print(f"Streaming data from {datafile} ...")
