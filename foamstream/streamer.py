@@ -6,6 +6,7 @@ The full license is in the file LICENSE, distributed with this software.
 Author: Jun Zhu <jun.zhu@psi.ch>
 """
 from queue import Empty, Queue
+import sys
 from threading import Event, Thread
 import time
 from typing import Callable, Optional, Union
@@ -19,6 +20,8 @@ _reset_counter_sentinel = object()
 
 
 class Streamer:
+
+    _mega_bytes = 1 / (1024 * 1024)
 
     def __init__(self, port: int, *,
                  serializer: Union[str, Callable] = "avro",
@@ -86,6 +89,8 @@ class Streamer:
         self._early_serialization = early_serialization
 
         self._counter = 0
+        self._t0 = time.time()
+        self._bytes_sent = 0
         self._report_every = report_every
 
     def _init_socket(self):
@@ -102,7 +107,13 @@ class Streamer:
         self._buffer.put(data)
 
     def start(self) -> None:
+        self.reset_counter()
         self._thread.start()
+
+    def _report(self):
+        rate = self._bytes_sent * self._mega_bytes / (time.time() - self._t0)
+        print(f"Number of items sent: {self._counter:>6d}. "
+              f"Average data rate: {rate:.1f} MB/s")
 
     def _send(self, socket, payload):
         if self._multipart:
@@ -111,12 +122,14 @@ class Streamer:
                     socket.send(item)
                 else:
                     socket.send(item, zmq.SNDMORE)
+                self._bytes_sent += sys.getsizeof(item)
         else:
             socket.send(payload)
+            self._bytes_sent += sys.getsizeof(payload)
 
         self._counter += 1
         if self._report_every > 0 and self._counter % self._report_every == 0:
-            print(f"Number of items sent: {self._counter:>6d}")
+            self._report()
 
     def _run(self) -> None:
         socket = self._init_socket()
@@ -165,9 +178,11 @@ class Streamer:
         self._ctx.destroy()
 
     def __reset_counter(self) -> None:
-        print(f"Number of items sent: {self._counter:>6d}")
+        if self._counter > 0:
+            self._report()
         self._counter = 0
+        self._t0 = time.time()
+        self._bytes_sent = 0
 
     def reset_counter(self) -> None:
         self._buffer.put(_reset_counter_sentinel)
-

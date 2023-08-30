@@ -16,5 +16,5 @@ if __name__ == "__main__":
                      deserializer=unpack,
                      sock="PULL",
                      multipart=True) as consumer:
-        for _ in range(10):
+        for _ in range(1000):
             print(consumer.next())
