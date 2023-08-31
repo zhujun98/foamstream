@@ -41,6 +41,7 @@ def test_zmq_streamer(serializer, deserializer, server_sock, client_sock, daemon
             for i in range(3):
                 data_gt = gen.next()
                 streamer.feed(data_gt)
+                time.sleep(0.01)
                 assert_result_equal(client.next(), data_gt)
 
 
@@ -67,6 +68,7 @@ def test_zmq_streamer_with_multipart_message(serializer, deserializer):
                          multipart=True,
                          timeout=1.0) as client:
             streamer.feed(data_gt)
+            time.sleep(0.01)
             assert client.next() == [{'a': 123}, {'b': 'Hello world'}]
 
 
@@ -85,6 +87,7 @@ def test_zmq_streamer_early_serialization(early_serialization):
 
             data_gt = gen.next()
             streamer.feed(data_gt)
+            time.sleep(0.01)
             assert_result_equal(client.next(), data_gt)
 
 
@@ -103,6 +106,7 @@ def test_zmq_streamer_report():
                     for _ in range(num_items):
                         data_gt = gen.next()
                         streamer.feed(data_gt)
+                        time.sleep(0.01)
                         assert_result_equal(client.next(), data_gt)
                     patched.assert_called_once()
                     assert streamer._counter == num_items

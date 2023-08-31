@@ -15,6 +15,19 @@ import h5py
 from ..streamer import Streamer
 
 
+sentinel = object()
+
+
+def index2string(index):
+    if index == 0:
+        return "DARK"
+    if index == 1:
+        return "FLAT"
+    if index == 2:
+        return "PROJECTION"
+    raise ValueError(f"Unknown scan index: {index}")
+
+
 def gen_index(start: int, end: int, *, ordered: bool = True):
     if ordered:
         yield from range(start, end)
@@ -46,7 +59,9 @@ def create_meta(scan_index, frame_index, shape):
     }
 
 
-def gen_fake_data(scan_index, n, *, shape, ordered):
+def gen_fake_data(counts, *, shape, ordered):
+    print("Streaming randomly generated data ...")
+
     darks = [np.random.randint(500, size=shape, dtype=np.uint16)
              for _ in range(10)]
     whites = [3596 + np.random.randint(500, size=shape, dtype=np.uint16)
@@ -54,51 +69,74 @@ def gen_fake_data(scan_index, n, *, shape, ordered):
     projections = [np.random.randint(4096, size=shape, dtype=np.uint16)
                    for _ in range(10)]
 
-    for i in gen_index(0, n, ordered=ordered):
-        meta = create_meta(scan_index, i, shape)
-        if scan_index == 0:
-            data = darks[np.random.choice(len(darks))]
-        elif scan_index == 1:
-            data = whites[np.random.choice(len(whites))]
-        else:
-            data = projections[np.random.choice(len(projections))]
+    for scan_index, n in enumerate(counts):
+        if n == 0:
+            if scan_index in (0, 1):
+                n = 10
+            else:
+                n = 400
 
-        yield meta, data
+        print(f"{index2string(scan_index)}: Image shape: {shape}. "
+              f"Number of images: {n}")
 
-
-def stream_data_file(filepath,  scan_index, *, start, end, ordered):
-    p_dark = "/exchange/data_dark"
-    p_flats = "/exchange/data_white"
-    p_projections = "/exchange/data"
-
-    with h5py.File(filepath, "r") as fp:
-        print(f"Data shapes - "
-              f"dark: {fp[p_dark].shape}, "
-              f"flat: {fp[p_flats].shape}, "
-              f"projection: {fp[p_projections].shape}")
-
-        if scan_index == 0:
-            ds = fp[p_dark]
-        elif scan_index == 1:
-            ds = fp[p_flats]
-        elif scan_index == 2:
-            ds = fp[p_projections]
-        else:
-            raise ValueError(f"Unsupported scan_index: {scan_index}")
-
-        shape = ds.shape[1:]
-        n_images = ds.shape[0]
-        if start == end:
-            end = start + n_images
-
-        for i in gen_index(start, end, ordered=ordered):
+        for i in gen_index(0, n, ordered=ordered):
             meta = create_meta(scan_index, i, shape)
-            # Repeating reading data from chunks if data size is smaller
-            # than the index range.
-            data = np.zeros(shape, dtype=np.uint16)
-            ds.read_direct(data, np.s_[i % n_images, ...], None)
+            if scan_index == 0:
+                data = darks[np.random.choice(len(darks))]
+            elif scan_index == 1:
+                data = whites[np.random.choice(len(whites))]
+            else:
+                data = projections[np.random.choice(len(projections))]
 
             yield meta, data
+
+        if scan_index < 2:
+            yield sentinel, None
+
+
+def rgb2grayscale(src, dst):
+    dst[...] = 0.2989 * src[..., 0] + 0.5870 * src[..., 1] + 0.1140 * src[..., 2]
+
+
+def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
+    with h5py.File(datafile, "r") as fp:
+        print(f"Streaming data from {datafile} ...")
+        for scan_index, (n, start, path) in enumerate(zip(counts, starts, datapaths)):
+            if path not in fp:
+                print(f"{index2string(scan_index)}: data not found")
+                continue
+
+            ds = fp[path]
+            shape = ds.shape[1:]
+            is_rgb = False
+            if len(shape) == 3:
+                is_rgb = True
+                assert ds.shape[-1] == 3
+            n_images = ds.shape[0]
+
+            end = start + n
+            if start == end:
+                end = start + n_images
+
+            print(f"{index2string(scan_index)}: Image shape: {shape}. "
+                  f"Number of images: {end - start} ({n_images})")
+
+            raw_data = np.zeros(shape, dtype=np.uint16)
+            proc_data = np.zeros(shape[:2], dtype=np.uint16) if is_rgb else None
+            for i in gen_index(start, end, ordered=ordered):
+                meta = create_meta(scan_index, i, shape[:2])
+                # Repeating reading data from chunks if data size is smaller
+                # than the index range.
+                ds.read_direct(raw_data, np.s_[i % n_images, ...], None)
+                if is_rgb:
+                    rgb2grayscale(raw_data, proc_data)
+                else:
+                    proc_data = raw_data
+
+                yield meta, proc_data
+
+            if scan_index < 2:
+                yield sentinel, None
 
 
 def parse_datafile(name: str, root: str) -> str:
@@ -117,6 +155,8 @@ def parse_datafile(name: str, root: str) -> str:
         return f"{root}/tomobank/fuelcell_dryHQ_i1.h5"
     if name in ["fuel1", "fuel2", "fuel3"]:
         return f"{root}/tomobank/fuelcell_i{name[-1]}.h5"
+    if name == "beads":
+        return f"{root}/tomobank/2_plastic_beeds_RGB.h5"
     return name
 
 
@@ -130,14 +170,18 @@ def main():
                         help="ZMQ socket port (default=9667)")
     parser.add_argument('--sock', default='push', type=str,
                         help="ZMQ socket type (default=PUSH)")
-    parser.add_argument('--darks', default=20, type=int,
-                        help="Number of dark images (default=20)")
-    parser.add_argument('--flats', default=20, type=int,
-                        help="Number of flat images (default=20)")
+    parser.add_argument('--darks', default=0, type=int,
+                        help="Number of dark images (default=0, i.e. "
+                             "the whole dark dataset when streaming from files or "
+                             "10 when generating fake data")
+    parser.add_argument('--flats', default=0, type=int,
+                        help="Number of flat images (default=0, i.e. "
+                             "the whole flat dataset when streaming from files or "
+                             "10 when generating fake data")
     parser.add_argument('--projections', default=0, type=int,
                         help="Number of projection images (default=0, i.e. "
                              "the whole projection dataset when streaming from files or "
-                             "500 otherwise")
+                             "400 otherwise")
     parser.add_argument('--start', default=0, type=int,
                         help="Starting index of the projection images (default=0)")
     parser.add_argument('--unordered', action='store_true',
@@ -159,10 +203,14 @@ def main():
                              "> fuel1 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i1, source: Tomobank\n"
                              "> fuel2 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i2, source: Tomobank\n"
                              "> fuel3 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i3, source: Tomobank\n"
+                             "> beads - shape: 200 x 440 x 130, sample: plastic bead, source: Tomobank\n"
                              )
     parser.add_argument('--datafile-root', type=str,
                         default="/das/work/p19/p19730/recastx_example_data",
                         help="Root directory of the data file")
+    parser.add_argument('--pdata', type=str, default="/exchange/data")
+    parser.add_argument('--pdark', type=str, default="/exchange/data_dark")
+    parser.add_argument('--pflat', type=str, default="/exchange/data_white")
 
     args = parser.parse_args()
 
@@ -179,41 +227,20 @@ def main():
                   report_every=1000) as streamer:
 
         if datafile:
-            print(f"Streaming data from {datafile} ...")
+            gen = stream_data_file(datafile, [args.darks, args.flats, args.projections],
+                                   ordered=not args.unordered,
+                                   starts=[0, 0, args.start],
+                                   datapaths=[args.pdark, args.pflat, args.pdata])
         else:
-            print("Streaming randomly generated data ...")
+            gen = gen_fake_data([args.darks, args.flats, args.projections],
+                                shape=(args.rows, args.cols),
+                                ordered=not args.unordered)
 
-        for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
-            if scan_index == 0:
-                print("Streaming darks ...")
-            elif scan_index == 1:
-                print("Streaming flats ...")
-            else:
-                print("Streaming projections ...")
-
-            if not datafile:
-                if n == 0:
-                    n = 500
-                gen = gen_fake_data(scan_index, n,
-                                    shape=(args.rows, args.cols),
-                                    ordered=not args.unordered)
-            else:
-                if scan_index == 2:
-                    gen = stream_data_file(datafile, scan_index,
-                                           start=args.start,
-                                           end=args.start + n,
-                                           ordered=not args.unordered)
-                else:
-                    gen = stream_data_file(datafile, scan_index,
-                                           start=0,
-                                           end=n,
-                                           ordered=not args.unordered)
-
-            for item in gen:
-                streamer.feed(item)
-
-            if scan_index < 2:
+        for item in gen:
+            if item[0] is sentinel:
                 streamer.reset_counter()
+            else:
+                streamer.feed(item)
 
 
 if __name__ == "__main__":
