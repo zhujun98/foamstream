@@ -98,7 +98,6 @@ def rgb2grayscale(src, dst):
 def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
     with h5py.File(datafile, "r") as fp:
         print(f"Streaming data from {datafile} ...")
-
         for scan_index, (n, start, path) in enumerate(zip(counts, starts, datapaths)):
             if path not in fp:
                 print(f"{index2string(scan_index)}: data not found")
@@ -133,8 +132,8 @@ def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
 
                 yield meta, proc_data
 
-        if scan_index < 2:
-            yield sentinel, None
+            if scan_index < 2:
+                yield sentinel, None
 
 
 def parse_datafile(name: str, root: str) -> str:
