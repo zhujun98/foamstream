@@ -15,6 +15,19 @@ import h5py
 from ..streamer import Streamer
 
 
+sentinel = object()
+
+
+def index2string(index):
+    if index == 0:
+        return "DARK"
+    if index == 1:
+        return "FLAT"
+    if index == 2:
+        return "PROJECTION"
+    raise ValueError(f"Unknown scan index: {index}")
+
+
 def gen_index(start: int, end: int, *, ordered: bool = True):
     if ordered:
         yield from range(start, end)
@@ -46,7 +59,9 @@ def create_meta(scan_index, frame_index, shape):
     }
 
 
-def gen_fake_data(scan_index, n, *, shape, ordered):
+def gen_fake_data(counts, *, shape, ordered):
+    print("Streaming randomly generated data ...")
+
     darks = [np.random.randint(500, size=shape, dtype=np.uint16)
              for _ in range(10)]
     whites = [3596 + np.random.randint(500, size=shape, dtype=np.uint16)
@@ -54,48 +69,55 @@ def gen_fake_data(scan_index, n, *, shape, ordered):
     projections = [np.random.randint(4096, size=shape, dtype=np.uint16)
                    for _ in range(10)]
 
-    for i in gen_index(0, n, ordered=ordered):
-        meta = create_meta(scan_index, i, shape)
-        if scan_index == 0:
-            data = darks[np.random.choice(len(darks))]
-        elif scan_index == 1:
-            data = whites[np.random.choice(len(whites))]
-        else:
-            data = projections[np.random.choice(len(projections))]
+    for scan_index, n in enumerate(counts):
+        if n == 0:
+            n = 500
 
-        yield meta, data
+        print(f"{index2string(scan_index)}: Image shape: {shape}. "
+              f"Number of images: {n}")
 
-
-def stream_data_file(filepath,  scan_index, *,
-                     start, end, ordered, p_dark, p_flat, p_data):
-    with h5py.File(filepath, "r") as fp:
-        print(f"Data shapes - "
-              f"dark: {fp[p_dark].shape}, "
-              f"flat: {fp[p_flat].shape}, "
-              f"projection: {fp[p_data].shape}")
-
-        if scan_index == 0:
-            ds = fp[p_dark]
-        elif scan_index == 1:
-            ds = fp[p_flat]
-        elif scan_index == 2:
-            ds = fp[p_data]
-        else:
-            raise ValueError(f"Unsupported scan_index: {scan_index}")
-
-        shape = ds.shape[1:]
-        n_images = ds.shape[0]
-        if start == end:
-            end = start + n_images
-
-        for i in gen_index(start, end, ordered=ordered):
+        for i in gen_index(0, n, ordered=ordered):
             meta = create_meta(scan_index, i, shape)
-            # Repeating reading data from chunks if data size is smaller
-            # than the index range.
-            data = np.zeros(shape, dtype=np.uint16)
-            ds.read_direct(data, np.s_[i % n_images, ...], None)
+            if scan_index == 0:
+                data = darks[np.random.choice(len(darks))]
+            elif scan_index == 1:
+                data = whites[np.random.choice(len(whites))]
+            else:
+                data = projections[np.random.choice(len(projections))]
 
             yield meta, data
+
+        if scan_index < 2:
+            yield sentinel, None
+
+
+def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
+    with h5py.File(datafile, "r") as fp:
+        print(f"Streaming data from {datafile} ...")
+
+        for scan_index, n, start, path in enumerate(zip(counts, starts, datapaths)):
+            ds = fp[path]
+            shape = ds.shape[1:]
+            n_images = ds.shape[0]
+
+            end = start + n
+            if start == end:
+                end = start + n_images
+
+            print(f"{index2string(scan_index)}: Image shape: {shape}. "
+                  f"Number of images: {end - start} ({n_images})")
+
+            for i in gen_index(start, end, ordered=ordered):
+                meta = create_meta(scan_index, i, shape)
+                # Repeating reading data from chunks if data size is smaller
+                # than the index range.
+                data = np.zeros(shape, dtype=np.uint16)
+                ds.read_direct(data, np.s_[i % n_images, ...], None)
+
+                yield meta, data
+
+        if scan_index < 2:
+            yield sentinel, None
 
 
 def parse_datafile(name: str, root: str) -> str:
@@ -182,45 +204,20 @@ def main():
                   report_every=1000) as streamer:
 
         if datafile:
-            print(f"Streaming data from {datafile} ...")
+            gen = stream_data_file(datafile, [args.darks, args.flats, args.projections],
+                                   ordered=not args.unordered,
+                                   starts=[0, 0, args.start],
+                                   datapaths=[args.pdark, args.pflat, args.pdata])
         else:
-            print("Streaming randomly generated data ...")
+            gen = gen_fake_data([args.darks, args.flats, args.projections],
+                                shape=(args.rows, args.cols),
+                                ordered=not args.unordered)
 
-        for scan_index, n in enumerate([args.darks, args.flats, args.projections]):
-            if scan_index == 0:
-                print("Streaming darks ...")
-            elif scan_index == 1:
-                print("Streaming flats ...")
-            else:
-                print("Streaming projections ...")
-
-            if not datafile:
-                if n == 0:
-                    n = 500
-                gen = gen_fake_data(scan_index, n,
-                                    shape=(args.rows, args.cols),
-                                    ordered=not args.unordered)
-            else:
-                if scan_index == 2:
-                    i_start = args.start
-                    i_end = args.start + n
-                else:
-                    i_start = 0
-                    i_end = n
-
-                gen = stream_data_file(datafile, scan_index,
-                                       start=i_start,
-                                       end=i_end,
-                                       ordered=not args.unordered,
-                                       p_dark=args.pdark,
-                                       p_flat=args.pflat,
-                                       p_data=args.pdata)
-
-            for item in gen:
-                streamer.feed(item)
-
-            if scan_index < 2:
+        for item in gen:
+            if item[0] is sentinel:
                 streamer.reset_counter()
+            else:
+                streamer.feed(item)
 
 
 if __name__ == "__main__":
