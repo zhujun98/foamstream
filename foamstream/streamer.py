@@ -164,7 +164,7 @@ class Streamer:
 
     def stop(self) -> None:
         self._ev.set()
-        if not self._thread.isDaemon():
+        if not self._thread.daemon:
             self._thread.join()
 
     def __enter__(self):
