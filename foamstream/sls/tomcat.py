@@ -91,6 +91,10 @@ def gen_fake_data(counts, *, shape, ordered):
             yield sentinel, None
 
 
+def rgb2grayscale(src, dst):
+    dst[...] = 0.2989 * src[..., 0] + 0.5870 * src[..., 1] + 0.1140 * src[..., 2]
+
+
 def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
     with h5py.File(datafile, "r") as fp:
         print(f"Streaming data from {datafile} ...")
@@ -102,6 +106,10 @@ def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
 
             ds = fp[path]
             shape = ds.shape[1:]
+            is_rgb = False
+            if len(shape) == 3:
+                is_rgb = True
+                assert ds.shape[-1] == 3
             n_images = ds.shape[0]
 
             end = start + n
@@ -111,14 +119,19 @@ def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
             print(f"{index2string(scan_index)}: Image shape: {shape}. "
                   f"Number of images: {end - start} ({n_images})")
 
+            raw_data = np.zeros(shape, dtype=np.uint16)
+            proc_data = np.zeros(shape[:2], dtype=np.uint16) if is_rgb else None
             for i in gen_index(start, end, ordered=ordered):
-                meta = create_meta(scan_index, i, shape)
+                meta = create_meta(scan_index, i, shape[:2])
                 # Repeating reading data from chunks if data size is smaller
                 # than the index range.
-                data = np.zeros(shape, dtype=np.uint16)
-                ds.read_direct(data, np.s_[i % n_images, ...], None)
+                ds.read_direct(raw_data, np.s_[i % n_images, ...], None)
+                if is_rgb:
+                    rgb2grayscale(raw_data, proc_data)
+                else:
+                    proc_data = raw_data
 
-                yield meta, data
+                yield meta, proc_data
 
         if scan_index < 2:
             yield sentinel, None
