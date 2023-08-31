@@ -41,23 +41,23 @@ def check_data(meta, data, *, scan_index, frame_id):
     assert data.dtype == np.uint16
 
 
-def check_result(ret):
-    assert len(ret) == np.sum(IMAGE_COUNTS) + 2
-    for i in range(IMAGE_COUNTS[0]):
+def check_result(ret, counts):
+    assert len(ret) == np.sum(counts) + 2
+    for i in range(counts[0]):
         check_data(*ret[i], frame_id=i, scan_index=0)
-    assert ret[IMAGE_COUNTS[0]] == (sentinel, None)
-    for i in range(IMAGE_COUNTS[1]):
-        check_data(*ret[IMAGE_COUNTS[0] + 1 + i], frame_id=i, scan_index=1)
-    assert ret[np.sum(IMAGE_COUNTS[:2]) + 1] == (sentinel, None)
-    for i in range(IMAGE_COUNTS[2]):
-        check_data(*ret[np.sum(IMAGE_COUNTS[:2]) + 2 + i], frame_id=i, scan_index=2)
+    assert ret[counts[0]] == (sentinel, None)
+    for i in range(counts[1]):
+        check_data(*ret[counts[0] + 1 + i], frame_id=i, scan_index=1)
+    assert ret[np.sum(counts[:2]) + 1] == (sentinel, None)
+    for i in range(counts[2]):
+        check_data(*ret[np.sum(counts[:2]) + 2 + i], frame_id=i, scan_index=2)
 
 
 def test_gen_fake_data():
     ret = []
     for item in gen_fake_data(IMAGE_COUNTS, shape=IMAGE_SHAPE, ordered=True):
         ret.append(item)
-    check_result(ret)
+    check_result(ret, IMAGE_COUNTS)
 
 
 def write_temp_file(filepath):
@@ -80,9 +80,19 @@ def test_stream_data_file(file_generator):
         file_generator(tempfile.name)
 
         ret = []
-        for item in stream_data_file(tempfile.name, IMAGE_COUNTS,
+        for item in stream_data_file(tempfile.name, [0, 0, 0],
                                      ordered=True,
                                      starts=[0, 0, 0],
                                      datapaths=["darks", "flats", "projections"]):
             ret.append(item)
-        check_result(ret)
+        check_result(ret, IMAGE_COUNTS)
+
+        # the request numbers of images are larger than the size of the datasets
+        ret = []
+        counts = [2 * x for x in IMAGE_COUNTS]
+        for item in stream_data_file(tempfile.name, counts,
+                                     ordered=True,
+                                     starts=[0, 0, 0],
+                                     datapaths=["darks", "flats", "projections"]):
+            ret.append(item)
+        check_result(ret, counts)

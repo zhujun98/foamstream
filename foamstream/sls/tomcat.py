@@ -71,7 +71,10 @@ def gen_fake_data(counts, *, shape, ordered):
 
     for scan_index, n in enumerate(counts):
         if n == 0:
-            n = 500
+            if scan_index in (0, 1):
+                n = 10
+            else:
+                n = 400
 
         print(f"{index2string(scan_index)}: Image shape: {shape}. "
               f"Number of images: {n}")
@@ -167,14 +170,18 @@ def main():
                         help="ZMQ socket port (default=9667)")
     parser.add_argument('--sock', default='push', type=str,
                         help="ZMQ socket type (default=PUSH)")
-    parser.add_argument('--darks', default=20, type=int,
-                        help="Number of dark images (default=20)")
-    parser.add_argument('--flats', default=20, type=int,
-                        help="Number of flat images (default=20)")
+    parser.add_argument('--darks', default=0, type=int,
+                        help="Number of dark images (default=0, i.e. "
+                             "the whole dark dataset when streaming from files or "
+                             "10 when generating fake data")
+    parser.add_argument('--flats', default=0, type=int,
+                        help="Number of flat images (default=0, i.e. "
+                             "the whole flat dataset when streaming from files or "
+                             "10 when generating fake data")
     parser.add_argument('--projections', default=0, type=int,
                         help="Number of projection images (default=0, i.e. "
                              "the whole projection dataset when streaming from files or "
-                             "500 otherwise")
+                             "400 otherwise")
     parser.add_argument('--start', default=0, type=int,
                         help="Starting index of the projection images (default=0)")
     parser.add_argument('--unordered', action='store_true',
