@@ -114,6 +114,8 @@ def parse_datafile(name: str, root: str) -> str:
         return f"{root}/tomobank/fuelcell_dryHQ_i1.h5"
     if name in ["fuel1", "fuel2", "fuel3"]:
         return f"{root}/tomobank/fuelcell_i{name[-1]}.h5"
+    if name == "beads":
+        return f"{root}/tomobank/2_plastic_beeds_RGB.h5"
     return name
 
 
@@ -156,6 +158,7 @@ def main():
                              "> fuel1 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i1, source: Tomobank\n"
                              "> fuel2 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i2, source: Tomobank\n"
                              "> fuel3 - shape: 60 x 301 x 1100 x 1440, sample: fuelcell_i3, source: Tomobank\n"
+                             "> beads - shape: 200 x 440 x 130, sample: plastic bead, source: Tomobank\n"
                              )
     parser.add_argument('--datafile-root', type=str,
                         default="/das/work/p19/p19730/recastx_example_data",
