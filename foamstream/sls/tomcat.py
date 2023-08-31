@@ -66,23 +66,20 @@ def gen_fake_data(scan_index, n, *, shape, ordered):
         yield meta, data
 
 
-def stream_data_file(filepath,  scan_index, *, start, end, ordered):
-    p_dark = "/exchange/data_dark"
-    p_flats = "/exchange/data_white"
-    p_projections = "/exchange/data"
-
+def stream_data_file(filepath,  scan_index, *,
+                     start, end, ordered, p_dark, p_flat, p_data):
     with h5py.File(filepath, "r") as fp:
         print(f"Data shapes - "
               f"dark: {fp[p_dark].shape}, "
-              f"flat: {fp[p_flats].shape}, "
-              f"projection: {fp[p_projections].shape}")
+              f"flat: {fp[p_flat].shape}, "
+              f"projection: {fp[p_data].shape}")
 
         if scan_index == 0:
             ds = fp[p_dark]
         elif scan_index == 1:
-            ds = fp[p_flats]
+            ds = fp[p_flat]
         elif scan_index == 2:
-            ds = fp[p_projections]
+            ds = fp[p_data]
         else:
             raise ValueError(f"Unsupported scan_index: {scan_index}")
 
@@ -163,6 +160,9 @@ def main():
     parser.add_argument('--datafile-root', type=str,
                         default="/das/work/p19/p19730/recastx_example_data",
                         help="Root directory of the data file")
+    parser.add_argument('--pdata', type=str, default="/exchange/data")
+    parser.add_argument('--pdark', type=str, default="/exchange/data_dark")
+    parser.add_argument('--pflat', type=str, default="/exchange/data_white")
 
     args = parser.parse_args()
 
@@ -199,15 +199,19 @@ def main():
                                     ordered=not args.unordered)
             else:
                 if scan_index == 2:
-                    gen = stream_data_file(datafile, scan_index,
-                                           start=args.start,
-                                           end=args.start + n,
-                                           ordered=not args.unordered)
+                    i_start = args.start
+                    i_end = args.start + n
                 else:
-                    gen = stream_data_file(datafile, scan_index,
-                                           start=0,
-                                           end=n,
-                                           ordered=not args.unordered)
+                    i_start = 0
+                    i_end = n
+
+                gen = stream_data_file(datafile, scan_index,
+                                       start=i_start,
+                                       end=i_end,
+                                       ordered=not args.unordered,
+                                       p_dark=args.pdark,
+                                       p_flat=args.pflat,
+                                       p_data=args.pdata)
 
             for item in gen:
                 streamer.feed(item)
