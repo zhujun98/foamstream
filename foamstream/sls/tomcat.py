@@ -95,7 +95,7 @@ def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
     with h5py.File(datafile, "r") as fp:
         print(f"Streaming data from {datafile} ...")
 
-        for scan_index, n, start, path in enumerate(zip(counts, starts, datapaths)):
+        for scan_index, (n, start, path) in enumerate(zip(counts, starts, datapaths)):
             if path not in fp:
                 print(f"{index2string(scan_index)}: data not found")
                 continue
