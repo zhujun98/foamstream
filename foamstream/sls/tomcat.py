@@ -96,6 +96,10 @@ def stream_data_file(datafile,  counts, *, ordered, starts, datapaths):
         print(f"Streaming data from {datafile} ...")
 
         for scan_index, n, start, path in enumerate(zip(counts, starts, datapaths)):
+            if path not in fp:
+                print(f"{index2string(scan_index)}: data not found")
+                continue
+
             ds = fp[path]
             shape = ds.shape[1:]
             n_images = ds.shape[0]
