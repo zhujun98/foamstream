@@ -6,27 +6,16 @@
 **foamstream** facilitates streaming data acquired at scientific user facilities from, typically 
 [HDF5](https://www.hdfgroup.org/solutions/hdf5/), files.
 
+## Tomography
+
+```sh
+foamstream-tomo --datafile <Your/file/path>
+```
+
 ## EuXFEL
 
 Start the Qt GUI, which is also implemented in 
 [EXtra-foam](https://extra-foam.readthedocs.io/en/latest/tutorial_file_stream.html) with
 ```sh
 foamstream-euxfel
-```
-
-## SLS
-
-Currently there is no unified data format at SLS. For the time being, we use different command
-for different beamlines.
-
-### TOMCAT
-
-```sh
-foamstream-tomcat
-```
-
-### Debye
-
-```sh
-foamstream-debye
 ```
