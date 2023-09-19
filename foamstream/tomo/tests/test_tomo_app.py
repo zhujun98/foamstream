@@ -4,7 +4,7 @@ from tempfile import NamedTemporaryFile
 import numpy as np
 import h5py
 
-from foamstream.sls.tomcat import (
+from foamstream.tomo.app import (
     gen_fake_data, gen_index, sentinel, stream_data_file
 )
 

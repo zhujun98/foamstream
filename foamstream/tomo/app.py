@@ -162,7 +162,7 @@ def parse_datafile(name: str, root: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Fake GigaFrost Data Stream',
+        description='Tomography data streamer',
         formatter_class=argparse.RawTextHelpFormatter
     )
 

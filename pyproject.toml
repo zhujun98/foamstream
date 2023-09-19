@@ -41,12 +41,10 @@ euxfel = [
 
 [project.scripts]
 foamstream-euxfel = "foamstream.euxfel.app:application"
-foamstream-tomcat = "foamstream.sls.tomcat:main"
-foamstream-debye = "foamstream.sls.debye:main"
+foamstream-tomo = "foamstream.tomo.app:main"
 
 [tool.setuptools.package-data]
 "foamstream.euxfel.icons" = ["*.png"]
-"foamstream.sls.schemas" = ["*.avsc"]
 
 [project.urls]
 repository = "https://github.com/zhujun98/foamstream"
