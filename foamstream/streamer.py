@@ -5,6 +5,7 @@ The full license is in the file LICENSE, distributed with this software.
 
 Author: Jun Zhu <jun.zhu@psi.ch>
 """
+from collections import deque
 from queue import Empty, Queue
 import sys
 from threading import Event, Thread
@@ -34,6 +35,7 @@ class Streamer:
                  buffer_size: int = 10,
                  daemon: bool = False,
                  early_serialization: bool = False,
+                 frequency: float = -1,
                  report_every: int = 100):
         """Initialization.
 
@@ -54,6 +56,9 @@ class Streamer:
             thread.
         :param early_serialization: If True, the data will be serialized before queued
             for being sent.
+        :param frequency: Data sending frequency. Data will be sent as fast as the
+            streamer can if frequency <= 0. Note that the specified frequency might
+            not be fulfilled if it exceeds the intrinsic limit.
         :param report_every: the interval of reporting (e.g. print out) the number
             of data sent.
         """
@@ -88,9 +93,11 @@ class Streamer:
 
         self._early_serialization = early_serialization
 
-        self._counter = 0
-        self._t0 = time.time()
+        self._t0 = time.monotonic()
+        self._records_sent = 0
         self._bytes_sent = 0
+
+        self._frequency = frequency
         self._report_every = report_every
 
     def _init_socket(self):
@@ -104,6 +111,13 @@ class Streamer:
     def feed(self, data: object) -> None:
         if self._early_serialization:
             data = self._pack(data)
+
+        # I suspect that the producer could continuously producing data
+        # instead of waking up the consumer and let the consumer consume
+        # the data.
+        #
+        # See potentially relevant Python bug:
+        #     https://bugs.python.org/issue7946
         self._buffer.put(data)
 
     def start(self) -> None:
@@ -111,9 +125,12 @@ class Streamer:
         self._thread.start()
 
     def _report(self):
-        rate = self._bytes_sent * self._mega_bytes / (time.time() - self._t0)
-        print(f"Number of items sent: {self._counter:>6d}. "
-              f"Average data rate: {rate:.1f} MB/s")
+        dt = time.monotonic() - self._t0
+        data_frequency = self._records_sent / dt
+        data_rate = self._bytes_sent * self._mega_bytes / dt
+        print(f"Number of records sent: "
+              f"{self._records_sent:>6d} ({data_frequency:.1f} Hz). "
+              f"Average data rate: {data_rate:.1f} MB/s")
 
     def _send(self, socket, payload):
         if self._multipart:
@@ -127,13 +144,23 @@ class Streamer:
             socket.send(payload)
             self._bytes_sent += sys.getsizeof(payload)
 
-        self._counter += 1
-        if self._report_every > 0 and self._counter % self._report_every == 0:
+        self._records_sent += 1
+        if self._report_every > 0 and self._records_sent % self._report_every == 0:
             self._report()
 
     def _run(self) -> None:
         socket = self._init_socket()
         rep_ready = False
+
+        if self._frequency > 0:
+            sent_interval = 1. / self._frequency
+            # use moving average to get more accurate result
+            t_sent = deque(maxlen=max(10, int(self._frequency) + 1))
+            t_sent.append(self._t0)
+        else:
+            sent_interval = 0.
+            t_sent = None
+
         while not self._ev.is_set():
             if self._sock_type == zmq.REP and not rep_ready:
                 try:
@@ -151,6 +178,8 @@ class Streamer:
                 data = self._buffer.get(timeout=0.1)
                 if data == _reset_counter_sentinel:
                     self.__reset_counter()
+                    if t_sent is not None:
+                        t_sent.clear()
                     continue
 
                 if not self._early_serialization:
@@ -159,6 +188,13 @@ class Streamer:
 
                 if self._sock_type == zmq.REP:
                     rep_ready = False
+
+                if t_sent is not None:
+                    t_sent.append(time.monotonic())
+                    dt = t_sent[-1] - t_sent[0]
+                    t_wait = (len(t_sent) - 1) * sent_interval - dt
+                    if t_wait > 0:
+                        time.sleep(t_wait)
             except Empty:
                 continue
 
@@ -173,16 +209,16 @@ class Streamer:
 
     def __exit__(self, *exc):
         while not self._buffer.empty():
-            time.sleep(1.)
+            time.sleep(0.01)
         self.stop()
         self._ctx.destroy()
 
     def __reset_counter(self) -> None:
-        if self._counter > 0:
+        if self._records_sent > 0:
             self._report()
-        self._counter = 0
-        self._t0 = time.time()
+        self._records_sent = 0
         self._bytes_sent = 0
+        self._t0 = time.monotonic()
 
     def reset_counter(self) -> None:
         self._buffer.put(_reset_counter_sentinel)
