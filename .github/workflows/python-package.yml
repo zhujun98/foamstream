@@ -30,4 +30,4 @@ jobs:
         python -m pip install '.[test,euxfel]'
     - name: Test with pytest
       run: |
-        pytest foamstream -v
+        pytest foamstream -s

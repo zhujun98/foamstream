@@ -100,9 +100,14 @@ class Streamer:
         self._frequency = frequency
         self._report_every = report_every
 
+        self.__config = {
+            "socket_linger": 1000,  # in milliseconds
+            "buffer_linger": 1,  # in second
+        }
+
     def _init_socket(self):
         socket = self._ctx.socket(self._sock_type)
-        socket.setsockopt(zmq.LINGER, 0)
+        socket.setsockopt(zmq.LINGER, self.__config["socket_linger"])
         socket.setsockopt(zmq.RCVTIMEO, self._recv_timeout)
         socket.set_hwm(self._hwm)
         socket.bind(f"tcp://*:{self._port}")
@@ -208,8 +213,12 @@ class Streamer:
         return self
 
     def __exit__(self, *exc):
+        t0 = time.monotonic()
         while not self._buffer.empty():
-            time.sleep(0.01)
+            if time.monotonic() - t0 < self.__config["buffer_linger"]:
+                time.sleep(0.1)
+                continue
+
         self.stop()
         self._ctx.destroy()
 

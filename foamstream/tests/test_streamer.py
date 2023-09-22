@@ -38,11 +38,14 @@ def test_zmq_streamer(serializer, deserializer, server_sock, client_sock, daemon
                          timeout=1.0) as client:
             if server_sock == "PUB":
                 time.sleep(0.1)
-            for i in range(3):
-                data_gt = gen.next()
-                streamer.feed(data_gt)
-                time.sleep(0.01)
-                assert_result_equal(client.next(), data_gt)
+
+            records = [gen.next() for _ in range(3)]
+
+            for record in records:
+                streamer.feed(record)
+
+            for record in records:
+                assert_result_equal(client.next(), record)
 
 
 @pytest.mark.parametrize(
