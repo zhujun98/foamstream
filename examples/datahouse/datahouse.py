@@ -7,7 +7,6 @@ Author: Jun Zhu <jun.zhu@psi.ch>
 """
 import argparse
 from pathlib import Path
-import time
 
 from faker import Faker
 from fastavro.schema import load_schema
@@ -23,6 +22,8 @@ def main():
                         help="ZMQ socket port (default=45454)")
     parser.add_argument('--sock', default='pub', type=str,
                         help="ZMQ socket type (default=PUB)")
+    parser.add_argument('--frequency', default=0, type=float,
+                        help="Data sent frequency")
     parser.add_argument('--count', default=0, type=int,
                         help="Number of records to be sent. Infinite if count <=0")
 
@@ -34,7 +35,8 @@ def main():
     with Streamer(args.port,
                   serializer="avro",
                   schema=schema,
-                  sock=args.sock) as streamer:
+                  sock=args.sock,
+                  frequency=args.frequency) as streamer:
         print("Start data streaming ...")
         counter = 0
         while True:
@@ -43,7 +45,6 @@ def main():
                 "age": np.random.randint(18, 100),
                 "stress": np.random.randn(86400)
             })
-            time.sleep(0.01)
 
             counter += 1
             if counter == args.count > 0:

@@ -109,12 +109,27 @@ def test_zmq_streamer_report():
                         time.sleep(0.01)
                         assert_result_equal(client.next(), data_gt)
                     patched.assert_called_once()
-                    assert streamer._counter == num_items
+                    assert streamer._records_sent == num_items
                     assert streamer._bytes_sent > 0
 
                     patched.reset_mock()
                     streamer.reset_counter()
                     time.sleep(0.01)
                     patched.assert_called_once()
-                    assert streamer._counter == 0
+                    assert streamer._records_sent == 0
                     assert streamer._bytes_sent == 0
+
+
+@pytest.mark.parametrize("frequency", [100, 100.5])
+def test_zmq_streamer_sent_frequency(frequency):
+    gen = AvroDataGenerator()
+
+    with Streamer(_PORT,
+                  sock="PUB",
+                  schema=gen.schema,
+                  frequency=frequency) as streamer:
+        t0 = time.monotonic()
+        for _ in range(int(frequency) + 1):
+            streamer.feed(gen.next())
+        # It should take roughly 1 second
+        assert abs(time.monotonic() - t0 - 1.0) < 0.2
