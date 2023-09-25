@@ -36,7 +36,9 @@ class Streamer:
                  daemon: bool = False,
                  early_serialization: bool = False,
                  frequency: float = -1,
-                 report_every: int = 100):
+                 report_every: int = 100,
+                 zmq_linger: int = -1,
+                 buffer_linger: int = -1):
         """Initialization.
 
         :param port: port of the ZMQ server.
@@ -61,6 +63,11 @@ class Streamer:
             not be fulfilled if it exceeds the intrinsic limit.
         :param report_every: the interval of reporting (e.g. print out) the number
             of data sent.
+        :param zmq_linger: See ZMQ_LINGER.
+        :param buffer_linger: This linger period in milliseconds determines how long
+            it shall wait until the internal buffer is empty before stopping the
+            worker thread. As ZMQ linger, negative value specifies an infinite linger
+            period.
         """
         self._port = port
         self._ctx = zmq.Context()
@@ -100,14 +107,12 @@ class Streamer:
         self._frequency = frequency
         self._report_every = report_every
 
-        self.__config = {
-            "socket_linger": 1000,  # in milliseconds
-            "buffer_linger": 1,  # in second
-        }
+        self._zmq_linger = zmq_linger
+        self._buffer_linger = buffer_linger
 
     def _init_socket(self):
         socket = self._ctx.socket(self._sock_type)
-        socket.setsockopt(zmq.LINGER, self.__config["socket_linger"])
+        socket.setsockopt(zmq.LINGER, self._zmq_linger)
         socket.setsockopt(zmq.RCVTIMEO, self._recv_timeout)
         socket.set_hwm(self._hwm)
         socket.bind(f"tcp://*:{self._port}")
@@ -204,21 +209,28 @@ class Streamer:
                 continue
 
     def stop(self) -> None:
+        self.__clean_up()
         self._ev.set()
         if not self._thread.daemon:
             self._thread.join()
+
+    def __clean_up(self):
+        if self._buffer_linger < 0:
+            while not self._buffer.empty():
+                time.sleep(0.01)
+        else:
+            t0 = time.monotonic()
+            while not self._buffer.empty():
+                if time.monotonic() - t0 < self._buffer_linger / 1000:
+                    time.sleep(0.01)
+                else:
+                    break
 
     def __enter__(self):
         self.start()
         return self
 
     def __exit__(self, *exc):
-        t0 = time.monotonic()
-        while not self._buffer.empty():
-            if time.monotonic() - t0 < self.__config["buffer_linger"]:
-                time.sleep(0.1)
-                continue
-
         self.stop()
         self._ctx.destroy()
 
