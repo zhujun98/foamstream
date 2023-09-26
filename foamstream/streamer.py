@@ -25,56 +25,47 @@ class Streamer:
     _mega_bytes = 1 / (1024 * 1024)
 
     def __init__(self, port: int, *,
-                 serializer: Union[str, Callable] = "avro",
-                 schema: Optional[object] = None,
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
-                 multipart: bool = False,
                  request: bytes = b"READY",
-                 hwm: Optional[int] = None,
-                 buffer_size: int = 10,
-                 daemon: bool = False,
-                 early_serialization: bool = False,
-                 frequency: float = -1,
-                 report_every: int = 100,
+                 hwm: int = 1000,
                  zmq_linger: int = -1,
-                 buffer_linger: int = -1):
+                 serializer: Union[str, Callable] = "avro",
+                 schema: Optional[object] = None,
+                 multipart: bool = False,
+                 early_serialization: bool = False,
+                 buffer_size: int = 10,
+                 buffer_linger: int = -1,
+                 frequency: float = -1,
+                 report_every: int = 100):
         """Initialization.
 
+        :param sock: socket type of the ZMQ server.
         :param port: port of the ZMQ server.
+        :param recv_timeout: maximum time in seconds before a recv operation raises
+            zmq.error.Again.
+        :param request: acknowledgement expected from the REQ server when the socket
+            type is REP.
+        :param hwm: high watermark in ZMQ.
+        :param zmq_linger: See ZMQ_LINGER.
         :param serializer: serializer type or a callable object which serializes
             the data.
         :param schema: optional data schema for the serializer.
-        :param sock: socket type of the ZMQ server.
-        :param recv_timeout: maximum time in seconds before a recv operation raises
-            zmq.error.Again.
         :param multipart: whether the data will be sent as a multipart message.
-        :param request: acknowledgement expected from the REQ server when the socket
-            type is REP.
-        :param hwm: high water mark in ZMQ.
-        :param buffer_size: size of the internal buffer for holding the data
-            to be sent.
-        :param daemon: True for making the thread in which the socket runs a daemon
-            thread.
         :param early_serialization: If True, the data will be serialized before queued
             for being sent.
+        :param buffer_size: size of the internal buffer for holding the data
+            to be sent.
+        :param buffer_linger: This linger period in milliseconds determines how long
+            it shall wait until the internal buffer is empty before stopping the
+            worker thread. As ZMQ linger, negative value specifies an infinite linger
+            period.
         :param frequency: Data sending frequency. Data will be sent as fast as the
             streamer can if frequency <= 0. Note that the specified frequency might
             not be fulfilled if it exceeds the intrinsic limit.
         :param report_every: the interval of reporting (e.g. print out) the number
             of data sent.
-        :param zmq_linger: See ZMQ_LINGER.
-        :param buffer_linger: This linger period in milliseconds determines how long
-            it shall wait until the internal buffer is empty before stopping the
-            worker thread. As ZMQ linger, negative value specifies an infinite linger
-            period.
         """
-        self._port = port
-        self._ctx = zmq.Context()
-        self._recv_timeout = int(recv_timeout * 1000)
-        self._request = request
-        self._multipart = multipart
-
         sock = sock.upper()
         if sock == 'PUSH':
             self._sock_type = zmq.PUSH
@@ -85,17 +76,23 @@ class Streamer:
         else:
             raise ValueError('Unsupported ZMQ socket type: %s' % str(sock))
 
-        self._hwm = 1000 if hwm is None else hwm
+        self._port = port
+        self._recv_timeout = int(recv_timeout * 1000)
+        self._request = request
+        self._hwm = hwm
+        self._zmq_linger = zmq_linger
 
         if callable(serializer):
             self._pack = serializer
         else:
             self._pack = create_serializer(
                 serializer, schema, multipart=multipart)
+        self._multipart = multipart
 
         self._buffer = Queue(maxsize=buffer_size)
+        self._buffer_linger = buffer_linger
 
-        self._thread = Thread(target=self._run, daemon=daemon)
+        self._thread = Thread(target=self._run)
         self._ev = Event()
 
         self._early_serialization = early_serialization
@@ -107,16 +104,14 @@ class Streamer:
         self._frequency = frequency
         self._report_every = report_every
 
-        self._zmq_linger = zmq_linger
-        self._buffer_linger = buffer_linger
-
-    def _init_socket(self):
-        socket = self._ctx.socket(self._sock_type)
+    def _init(self):
+        ctx = zmq.Context()
+        socket = ctx.socket(self._sock_type)
         socket.setsockopt(zmq.LINGER, self._zmq_linger)
         socket.setsockopt(zmq.RCVTIMEO, self._recv_timeout)
         socket.set_hwm(self._hwm)
         socket.bind(f"tcp://*:{self._port}")
-        return socket
+        return ctx, socket
 
     def feed(self, data: object) -> None:
         if self._early_serialization:
@@ -159,7 +154,8 @@ class Streamer:
             self._report()
 
     def _run(self) -> None:
-        socket = self._init_socket()
+        ctx, socket = self._init()
+
         rep_ready = False
 
         if self._frequency > 0:
@@ -208,11 +204,12 @@ class Streamer:
             except Empty:
                 continue
 
+        ctx.destroy()
+
     def stop(self) -> None:
         self.__clean_up()
         self._ev.set()
-        if not self._thread.daemon:
-            self._thread.join()
+        self._thread.join()
 
     def __clean_up(self):
         if self._buffer_linger < 0:
@@ -232,7 +229,6 @@ class Streamer:
 
     def __exit__(self, *exc):
         self.stop()
-        self._ctx.destroy()
 
     def __reset_counter(self) -> None:
         if self._records_sent > 0:
