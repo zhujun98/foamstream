@@ -166,6 +166,8 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
 
+    parser.add_argument('--protocol', default="tcp", type=str,
+                        help="ZMQ transport protocol (default=TCP)")
     parser.add_argument('--port', default="9667", type=int,
                         help="ZMQ socket port (default=9667)")
     parser.add_argument('--sock', default='push', type=str,
@@ -221,6 +223,8 @@ def main():
         return json.dumps(meta).encode("utf8"), data
 
     with Streamer(args.port,
+                  protocol=args.protocol,
+                  ipc_address="foamstream.tomo.ipc",
                   serializer=pack,
                   multipart=True,
                   sock=args.sock,

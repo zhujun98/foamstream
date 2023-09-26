@@ -43,9 +43,9 @@ def main():
     schema = load_schema(Path(__file__).parent.joinpath("debye"))
 
     with Streamer(args.port,
+                  sock=args.sock,
                   serializer="avro",
                   schema=schema,
-                  sock=args.sock,
                   frequency=args.frequency) as streamer:
         samples, encoder = load_data()
         npts = 1000000

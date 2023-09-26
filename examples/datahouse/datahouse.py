@@ -33,9 +33,9 @@ def main():
 
     fake = Faker()
     with Streamer(args.port,
+                  sock=args.sock,
                   serializer="avro",
                   schema=schema,
-                  sock=args.sock,
                   frequency=args.frequency) as streamer:
         print("Start data streaming ...")
         counter = 0
