@@ -12,13 +12,15 @@ from .conftest import assert_result_equal, AvroDataGenerator, StringDataGenerato
 
 _PORT = 12345
 
-
-@pytest.mark.parametrize("server_sock,client_sock", [("PUSH", "PULL"), ("PUB", "SUB"), ("REP", "REQ")])
+@pytest.mark.parametrize("server_sock,client_sock,protocol",
+                         [("PUSH", "PULL", "iPc"),
+                          ("PUB", "SUB", "tcp"),
+                          ("REP", "REQ", "TCP")])
 @pytest.mark.parametrize(
     "serializer, deserializer", [("avro", "avro"),
                                  ("pickle", "pickle"),
                                  (lambda x: x.encode(), lambda x: x.bytes.decode())])
-def test_zmq_streamer(serializer, deserializer, server_sock, client_sock):
+def test_zmq_streamer(serializer, deserializer, server_sock, client_sock, protocol):
 
     if serializer == "avro":
         gen = AvroDataGenerator()
@@ -26,10 +28,15 @@ def test_zmq_streamer(serializer, deserializer, server_sock, client_sock):
         gen = StringDataGenerator()
 
     with Streamer(_PORT,
+                  protocol=protocol,
                   serializer=serializer,
                   schema=gen.schema,
                   sock=server_sock) as streamer:
-        with ZmqConsumer(f"tcp://localhost:{_PORT}",
+        if protocol.upper() == "TCP":
+            connect_to = f"tcp://localhost:{_PORT}"
+        else:
+            connect_to = f"ipc://foamstream.ipc"
+        with ZmqConsumer(connect_to,
                          deserializer=deserializer,
                          schema=gen.schema,
                          sock=client_sock,

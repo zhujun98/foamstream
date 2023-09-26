@@ -24,7 +24,9 @@ class Streamer:
 
     _mega_bytes = 1 / (1024 * 1024)
 
-    def __init__(self, port: int, *,
+    def __init__(self, port: int = 25469, *,
+                 protocol: str = "tcp",
+                 ipc_address: str = "foamstream.ipc",
                  sock: str = "PUSH",
                  recv_timeout: float = 0.1,
                  request: bytes = b"READY",
@@ -40,8 +42,11 @@ class Streamer:
                  report_every: int = 100):
         """Initialization.
 
-        :param sock: socket type of the ZMQ server.
-        :param port: port of the ZMQ server.
+        :param port: port of the ZMQ server. Ignored if the transport protocol
+            is ipc.
+        :param protocol: ZMQ transport protocol. Options are tcp, udp and ipc.
+        :param ipc_address: address if the transport protocol is ipc.
+        :param sock: socket type of the ZMQ server. Options are push, pub and rep.
         :param recv_timeout: maximum time in seconds before a recv operation raises
             zmq.error.Again.
         :param request: acknowledgement expected from the REQ server when the socket
@@ -66,16 +71,9 @@ class Streamer:
         :param report_every: the interval of reporting (e.g. print out) the number
             of data sent.
         """
-        sock = sock.upper()
-        if sock == 'PUSH':
-            self._sock_type = zmq.PUSH
-        elif sock == 'REP':
-            self._sock_type = zmq.REP
-        elif sock == 'PUB':
-            self._sock_type = zmq.PUB
-        else:
-            raise ValueError('Unsupported ZMQ socket type: %s' % str(sock))
-
+        self._sock_type = self._parse_sock_type(sock)
+        self._protocol = self._parse_protocol(protocol)
+        self._ipc_address = ipc_address
         self._port = port
         self._recv_timeout = int(recv_timeout * 1000)
         self._request = request
@@ -104,13 +102,34 @@ class Streamer:
         self._frequency = frequency
         self._report_every = report_every
 
+    def _parse_sock_type(self, sock: str):
+        sock = sock.upper()
+        if sock == 'PUSH':
+            return zmq.PUSH
+        if sock == 'REP':
+            return zmq.REP
+        if sock == 'PUB':
+            return zmq.PUB
+        raise ValueError(f"Unsupported ZMQ socket type: {sock}")
+
+    def _parse_protocol(self, protocol: str):
+        protocol = protocol.lower()
+        if protocol not in ["tcp", "ipc"]:
+            raise ValueError(f"Unsupported ZMQ transport protocol: {protocol}")
+        return protocol
+
     def _init(self):
         ctx = zmq.Context()
         socket = ctx.socket(self._sock_type)
         socket.setsockopt(zmq.LINGER, self._zmq_linger)
         socket.setsockopt(zmq.RCVTIMEO, self._recv_timeout)
         socket.set_hwm(self._hwm)
-        socket.bind(f"tcp://*:{self._port}")
+        if self._protocol == "tcp":
+            endpoint = f"tcp://*:{self._port}"
+        else:
+            endpoint = f"ipc://{self._ipc_address}"
+        socket.bind(endpoint)
+        print(f"Initialized server at {endpoint}")
         return ctx, socket
 
     def feed(self, data: object) -> None:
