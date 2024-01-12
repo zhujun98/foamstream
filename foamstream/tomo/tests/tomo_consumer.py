@@ -17,4 +17,5 @@ if __name__ == "__main__":
                      sock="PULL",
                      multipart=True) as consumer:
         for _ in range(1000):
-            print(consumer.next())
+            item = consumer.next()
+            print(item[0], np.mean(item[1]), np.min(item[1]), np.max(item[1]))
